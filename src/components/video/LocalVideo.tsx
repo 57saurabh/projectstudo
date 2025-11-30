@@ -12,6 +12,7 @@ export default function LocalVideo() {
     useEffect(() => {
         if (videoRef.current && localStream) {
             videoRef.current.srcObject = localStream;
+            videoRef.current.play().catch(e => console.log('Play error:', e));
         }
     }, [localStream]);
 
@@ -20,7 +21,6 @@ export default function LocalVideo() {
             {localStream && localStream.active && !isVideoOff ? (
                 <video
                     ref={videoRef}
-                    autoPlay
                     muted
                     playsInline
                     className="w-full h-full object-cover transform -scale-x-100"

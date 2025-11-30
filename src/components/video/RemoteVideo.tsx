@@ -15,6 +15,7 @@ export default function RemoteVideo({ stream, isMuted, isVideoOff, avatarUrl, di
     useEffect(() => {
         if (videoRef.current && stream) {
             videoRef.current.srcObject = stream;
+            videoRef.current.play().catch(e => console.log('Remote play error:', e));
         }
     }, [stream]);
 
@@ -23,7 +24,6 @@ export default function RemoteVideo({ stream, isMuted, isVideoOff, avatarUrl, di
             {stream && !isVideoOff ? (
                 <video
                     ref={videoRef}
-                    autoPlay
                     playsInline
                     className="w-full h-full object-cover"
                 />

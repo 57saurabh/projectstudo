@@ -69,6 +69,15 @@ export const useSignaling = () => {
             // If 1-on-1, maybe end call?
         });
 
+        socket.on('force-disconnect', () => {
+            console.log('Received force-disconnect. Resetting call and searching...');
+            resetCall();
+            // Optional: Add a small delay or UI feedback before searching again
+            setTimeout(() => {
+                findMatch();
+            }, 1000);
+        });
+
         return () => {
             socket.disconnect();
         };
@@ -91,8 +100,10 @@ export const useSignaling = () => {
         });
     }, [user]);
 
-    const skipMatch = useCallback((targetId: string) => {
-        socketRef.current?.emit('skip-match', { target: targetId });
+    const skipMatch = useCallback((targetId?: string) => {
+        if (targetId) {
+            socketRef.current?.emit('skip-match', { target: targetId });
+        }
         resetCall();
         findMatch(); // Auto-search
     }, [findMatch]);

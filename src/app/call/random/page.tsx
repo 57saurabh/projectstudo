@@ -11,8 +11,8 @@ import RemoteVideo from '@/components/video/RemoteVideo';
 
 export default function RandomChatPage() {
     const { user } = useSelector((state: RootState) => state.auth);
-    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, pendingMatch, acceptMatch } = useWebRTC();
-    const { participants, messages, isMuted, isVideoOff, toggleMute, toggleVideo, mediaError, remoteStreams } = useCallStore();
+    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, pendingMatch, acceptMatch, toggleMic, toggleCam } = useWebRTC();
+    const { participants, messages, isMuted, isVideoOff, mediaError, remoteStreams } = useCallStore();
 
     const [inputMessage, setInputMessage] = useState('');
     const [userCount, setUserCount] = useState(0);
@@ -246,13 +246,13 @@ export default function RandomChatPage() {
                     <div className="relative mb-6 flex justify-center z-10">
                         <div className="flex items-center gap-3 rounded-xl bg-black/40 backdrop-blur-xl p-2 border border-white/10 shadow-2xl">
                             <button
-                                onClick={toggleMute}
+                                onClick={toggleMic}
                                 className={`p-3 rounded-lg transition-colors ${isMuted ? 'bg-red-500/20 text-red-500' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
                             >
                                 {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
                             </button>
                             <button
-                                onClick={toggleVideo}
+                                onClick={toggleCam}
                                 className={`p-3 rounded-lg transition-colors ${isVideoOff ? 'bg-red-500/20 text-red-500' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
                             >
                                 {isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}

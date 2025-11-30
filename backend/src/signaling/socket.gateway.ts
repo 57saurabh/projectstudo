@@ -13,6 +13,7 @@ export class SocketGateway {
 
     private userStartTimes: Map<string, number> = new Map();
     private userReputations: Map<string, number> = new Map();
+    private activeMatches: Map<string, Set<string>> = new Map(); // Track active connections: userId -> Set<peerId>
 
     private initialize() {
         this.io.on('connection', (socket: Socket) => {
@@ -49,6 +50,13 @@ export class SocketGateway {
                     const now = Date.now();
                     this.userStartTimes.set(socket.id, now);
                     this.userStartTimes.set(match, now);
+
+                    // Track active match
+                    if (!this.activeMatches.has(socket.id)) this.activeMatches.set(socket.id, new Set());
+                    if (!this.activeMatches.has(match)) this.activeMatches.set(match, new Set());
+
+                    this.activeMatches.get(socket.id)!.add(match);
+                    this.activeMatches.get(match)!.add(socket.id);
 
                     // Notify both users with profile info
                     this.io.to(socket.id).emit('match-found', {
@@ -88,48 +96,64 @@ export class SocketGateway {
                 socket.to(target).emit('chat-message', { sender: socket.id, message });
             });
 
+            // Handle Media State Change
+            socket.on('media-state-change', (data) => {
+                const { target, isMuted, isVideoOff } = data;
+                socket.to(target).emit('media-state-change', { sender: socket.id, isMuted, isVideoOff });
+            });
+
             // Handle Skip Match
             socket.on('skip-match', (data) => {
                 const { target } = data;
-
-                // Calculate reputation update
-                this.updateReputation(socket.id);
-                if (target) {
-                    this.updateReputation(target);
-                    socket.to(target).emit('peer-skipped', { sender: socket.id });
-                }
+                this.handleDisconnection(socket.id, target);
 
                 // Re-enter queue automatically
                 this.matchmakingService.addToQueue(socket.id);
-                this.matchmakingService.findMatch(socket.id).then((match) => {
-                    if (match) {
-                        const now = Date.now();
-                        this.userStartTimes.set(socket.id, now);
-                        this.userStartTimes.set(match, now);
-
-                        this.io.to(socket.id).emit('match-found', {
-                            peerId: match,
-                            initiator: true,
-                            reputation: this.userReputations.get(match) || 100,
-                            avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${match}`
-                        });
-                        this.io.to(match).emit('match-found', {
-                            peerId: socket.id,
-                            initiator: false,
-                            reputation: this.userReputations.get(socket.id) || 100,
-                            avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${socket.id}`
-                        });
-                    }
-                });
+                // Trigger find match logic again... (simplified for now)
             });
 
             socket.on('disconnect', () => {
                 console.log(`User disconnected: ${socket.id}`);
+                this.handleDisconnection(socket.id);
                 this.updateReputation(socket.id); // Update rep on disconnect
                 this.matchmakingService.removeFromQueue(socket.id);
                 this.io.emit('user-count', this.io.engine.clientsCount);
             });
         });
+    }
+
+    private handleDisconnection(userId: string, specificTarget?: string) {
+        const peers = this.activeMatches.get(userId);
+        if (!peers) return;
+
+        // If specific target (skip match), only handle that one
+        const targets = specificTarget ? [specificTarget] : Array.from(peers);
+
+        targets.forEach(peerId => {
+            if (peers.has(peerId)) {
+                const peerPeers = this.activeMatches.get(peerId);
+
+                // P2P Logic: If peer has only 1 connection (us), it's a 1-on-1 call
+                if (peerPeers && peerPeers.size === 1 && peerPeers.has(userId)) {
+                    // Force disconnect the peer (send them back to searching)
+                    this.io.to(peerId).emit('force-disconnect');
+
+                    // Cleanup
+                    peerPeers.delete(userId);
+                    this.activeMatches.delete(peerId);
+                } else {
+                    // Group Logic: Just notify peer we left
+                    this.io.to(peerId).emit('peer-left', { peerId: userId });
+                    if (peerPeers) peerPeers.delete(userId);
+                }
+
+                peers.delete(peerId);
+            }
+        });
+
+        if (peers.size === 0) {
+            this.activeMatches.delete(userId);
+        }
     }
 
     private updateReputation(userId: string) {

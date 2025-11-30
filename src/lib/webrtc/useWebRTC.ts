@@ -90,6 +90,7 @@ export const useWebRTC = () => {
 
         // Handle Remote Stream
         pc.ontrack = (event) => {
+            console.log('Received remote track from:', peerId, event.streams[0]);
             const [remoteStream] = event.streams;
             if (remoteStream) {
                 addRemoteStream(peerId, remoteStream);
@@ -107,7 +108,32 @@ export const useWebRTC = () => {
     useEffect(() => {
         if (!socket) return;
 
-        // ... (existing handlers)
+        socket.on('offer', async (data) => {
+            const { sender, sdp } = data;
+            if (!sender) return;
+            console.log('Received offer from:', sender);
+            const pc = createPeerConnection(sender);
+            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            socket.emit('answer', { target: sender, sdp: answer });
+        });
+
+        socket.on('answer', async (data) => {
+            const { sender, sdp } = data;
+            if (!sender) return;
+            console.log('Received answer from:', sender);
+            const pc = createPeerConnection(sender);
+            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+        });
+
+        socket.on('ice-candidate', async (data) => {
+            const { sender, candidate } = data;
+            if (!sender) return;
+            // console.log('Received ICE candidate from:', sender);
+            const pc = createPeerConnection(sender);
+            await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        });
 
         // Initiator logic (e.g., when match found)
         socket.on('match-found', async ({ peerId, initiator, reputation, avatarUrl }) => {
@@ -115,11 +141,18 @@ export const useWebRTC = () => {
             setPendingMatch({ peerId, initiator, reputation, avatarUrl });
         });
 
+        // Handle Media State Change
+        socket.on('media-state-change', ({ sender, isMuted, isVideoOff }) => {
+            const { updateParticipant } = useCallStore.getState();
+            updateParticipant(sender, { isMuted, isVideoOff });
+        });
+
         return () => {
             socket.off('offer');
             socket.off('answer');
             socket.off('ice-candidate');
             socket.off('match-found');
+            socket.off('media-state-change');
         };
     }, [socket, createPeerConnection]);
 
@@ -143,6 +176,36 @@ export const useWebRTC = () => {
         setPendingMatch(null); // Clear pending match if skipping
         skipMatch(peerId);
     }, [skipMatch]);
+
+    const toggleMic = useCallback(() => {
+        const { toggleMute, isMuted, participants } = useCallStore.getState();
+        toggleMute();
+
+        // Emit new state to all peers
+        const newMutedState = !isMuted; // Toggle flips it
+        participants.forEach(p => {
+            socket?.emit('media-state-change', {
+                target: p.id,
+                isMuted: newMutedState,
+                isVideoOff: undefined // Don't change video state
+            });
+        });
+    }, [socket]);
+
+    const toggleCam = useCallback(() => {
+        const { toggleVideo, isVideoOff, participants } = useCallStore.getState();
+        toggleVideo();
+
+        // Emit new state to all peers
+        const newVideoState = !isVideoOff; // Toggle flips it
+        participants.forEach(p => {
+            socket?.emit('media-state-change', {
+                target: p.id,
+                isMuted: undefined, // Don't change audio state
+                isVideoOff: newVideoState
+            });
+        });
+    }, [socket]);
 
     const toggleScreenShare = useCallback(async () => {
         try {
@@ -216,6 +279,8 @@ export const useWebRTC = () => {
         toggleScreenShare,
         addRandomUser,
         pendingMatch, // Expose pending match
-        acceptMatch   // Expose accept function
+        acceptMatch,   // Expose accept function
+        toggleMic,
+        toggleCam
     };
 };

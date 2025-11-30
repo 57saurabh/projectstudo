@@ -5,6 +5,7 @@ import { ReduxProvider } from "@/lib/store/ReduxProvider";
 import AuthGuard from "@/components/auth/AuthGuard";
 import AppLayout from "@/components/layout/AppLayout";
 import { CameraGuard } from '@/components/utils/CameraGuard';
+import AuthInitializer from "@/components/auth/AuthInitializer";
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 
@@ -19,9 +20,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} bg-background text-white min-h-screen overflow-hidden`}>
         <ReduxProvider>
+          <AuthInitializer />
           <CameraGuard />
           <AuthGuard>
             <AppLayout>
