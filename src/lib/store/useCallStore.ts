@@ -8,6 +8,9 @@ export interface Participant {
     reputation?: number;
     avatarUrl?: string;
     shouldOffer?: boolean;
+    bio?: string;
+    country?: string;
+    language?: string;
 }
 
 export interface ChatMessage {

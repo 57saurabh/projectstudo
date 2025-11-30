@@ -4,10 +4,18 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import { useWebRTC } from '@/lib/webrtc/useWebRTC';
 import { useCallStore } from '@/lib/store/useCallStore';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, SkipForward, UserPlus, Flag, Send, Bell, Monitor } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import LocalVideo from '@/components/video/LocalVideo';
-import RemoteVideo from '@/components/video/RemoteVideo';
+
+// Components
+import RandomChatHeader from '@/components/call/random/RandomChatHeader';
+import IncomingInvite from '@/components/call/random/IncomingInvite';
+import InviteUserModal from '@/components/call/random/InviteUserModal';
+import MatchOverlay from '@/components/call/random/MatchOverlay';
+import ConnectingOverlay from '@/components/call/random/ConnectingOverlay';
+import VideoGrid from '@/components/call/random/VideoGrid';
+import Controls from '@/components/call/random/Controls';
+import ChatArea from '@/components/call/random/ChatArea';
 
 export default function RandomChatPage() {
     const { user } = useSelector((state: RootState) => state.auth);
@@ -20,9 +28,7 @@ export default function RandomChatPage() {
     const [canAddFriend, setCanAddFriend] = useState(false);
     const [countdown, setCountdown] = useState(30);
     const [showInviteModal, setShowInviteModal] = useState(false);
-    const [inviteTargetId, setInviteTargetId] = useState('');
-
-    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const [hasAccepted, setHasAccepted] = useState(false);
 
     // In random chat, we assume the first participant is the peer
     const currentPeer = participants[0];
@@ -32,11 +38,15 @@ export default function RandomChatPage() {
     useEffect(() => {
         if (callState === 'proposed') {
             setCountdown(30);
+            setHasAccepted(false); // Reset acceptance state for new match
             const timer = setInterval(() => {
                 setCountdown((prev) => {
                     if (prev <= 1) {
                         clearInterval(timer);
-                        acceptMatch(); // Auto-accept
+                        if (!hasAccepted) {
+                            setHasAccepted(true);
+                            acceptMatch(); // Auto-accept
+                        }
                         return 0;
                     }
                     return prev - 1;
@@ -44,14 +54,23 @@ export default function RandomChatPage() {
             }, 1000);
             return () => clearInterval(timer);
         }
-    }, [callState, acceptMatch]);
+    }, [callState, acceptMatch, hasAccepted]);
+
+    const router = useRouter();
 
     useEffect(() => {
-        // Auto-start searching when page loads
-        if (callState === 'idle') {
+        if (user && !user.avatarUrl) {
+            // Redirect to profile page if no avatar
+            router.push('/settings/profile');
+        }
+    }, [user, router]);
+
+    useEffect(() => {
+        // Auto-start searching when page loads (only if user has avatar)
+        if (callState === 'idle' && user?.avatarUrl) {
             findMatch();
         }
-    }, [callState, findMatch]);
+    }, [callState, findMatch, user]);
 
     useEffect(() => {
         if (socket) {
@@ -66,10 +85,6 @@ export default function RandomChatPage() {
             abortCall();
         };
     }, [socket, abortCall]);
-
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
 
     // Friend Request Timer (3 minutes)
     useEffect(() => {
@@ -114,115 +129,27 @@ export default function RandomChatPage() {
         alert('Searching for another user to add...');
     };
 
-    const handleInviteSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (inviteTargetId.trim()) {
-            inviteUser(inviteTargetId.trim());
-            setShowInviteModal(false);
-            setInviteTargetId('');
-            alert(`Invite sent to ${inviteTargetId}`);
-        }
+    const handleInviteUser = (targetId: string) => {
+        inviteUser(targetId);
+        setShowInviteModal(false);
+        alert(`Invite sent to ${targetId}`);
     };
 
     return (
         <div className="relative flex h-screen w-full flex-col bg-[#f7f6f8] dark:bg-[#191121] font-sans overflow-hidden">
-            {/* Header */}
-            <header className="flex items-center justify-between whitespace-nowrap border-b border-white/10 px-6 py-3 bg-[#191121] z-10">
-                <div className="flex items-center gap-4 text-white">
-                    <div className="w-8 h-8 bg-[#7f19e6] rounded-full flex items-center justify-center font-bold text-lg">Z</div>
-                    <h2 className="text-lg font-bold">Zylo</h2>
-                </div>
-                <div className="hidden md:flex flex-1 justify-center items-center gap-9">
-                    <span className="text-white text-sm font-medium px-3 py-2 bg-[#7f19e6]/20 rounded-lg cursor-pointer">Random Chat</span>
-                    <span className="text-white/70 hover:text-white text-sm font-medium cursor-pointer transition-colors">Friends</span>
-                    <span className="text-white/70 hover:text-white text-sm font-medium cursor-pointer transition-colors">Groups</span>
-                    <Link href="/developer/online-users">
-                        <span className="text-white/70 hover:text-white text-sm font-medium cursor-pointer transition-colors">Online Users</span>
-                    </Link>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button className="hidden sm:flex items-center justify-center rounded-lg h-10 px-4 bg-[#7f19e6] text-white text-sm font-bold hover:bg-[#6d14c4] transition-colors">
-                        Go Pro
-                    </button>
-                    <button className="flex items-center justify-center rounded-lg h-10 w-10 bg-white/10 text-white hover:bg-white/20 transition-colors">
-                        <Bell size={20} />
-                    </button>
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-[#7f19e6] to-blue-500 p-[2px]">
-                        <div className="w-full h-full rounded-full bg-[#191121] flex items-center justify-center overflow-hidden">
-                            <span className="font-bold text-sm text-white">{user?.displayName?.[0] || 'U'}</span>
-                        </div>
-                    </div>
-                </div>
-            </header>
+            <RandomChatHeader user={user} />
 
-            {/* Invite Received Modal */}
-            {pendingInvite && (
-                <div className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-                    <h3 className="text-2xl font-bold text-white mb-4">Incoming Invite</h3>
-                    <div className="w-24 h-24 rounded-full border-4 border-[#7f19e6] overflow-hidden bg-gray-800 mb-4">
-                        <img
-                            src={pendingInvite.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${pendingInvite.senderId}`}
-                            alt="Sender Avatar"
-                            className="w-full h-full object-cover"
-                        />
-                    </div>
-                    <p className="text-white/80 mb-8 text-lg">
-                        <span className="font-bold text-white">{pendingInvite.senderName}</span> wants you to join their call.
-                    </p>
-                    <div className="flex gap-4 w-full max-w-xs">
-                        <button
-                            onClick={rejectInvite}
-                            className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition-colors"
-                        >
-                            Decline
-                        </button>
-                        <button
-                            onClick={() => acceptInvite(pendingInvite.senderId)}
-                            className="flex-1 py-3 rounded-xl bg-[#7f19e6] text-white font-bold hover:bg-[#6d14c4] transition-colors shadow-lg shadow-[#7f19e6]/20"
-                        >
-                            Accept
-                        </button>
-                    </div>
-                </div>
-            )}
+            <IncomingInvite
+                pendingInvite={pendingInvite}
+                onAccept={acceptInvite}
+                onReject={rejectInvite}
+            />
 
-            {/* Invite User Modal */}
-            {showInviteModal && (
-                <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-[#191121] border border-white/10 p-6 rounded-2xl w-full max-w-md shadow-2xl">
-                        <h3 className="text-xl font-bold text-white mb-4">Invite User</h3>
-                        <form onSubmit={handleInviteSubmit} className="flex flex-col gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-white/60 mb-1">User ID</label>
-                                <input
-                                    type="text"
-                                    value={inviteTargetId}
-                                    onChange={(e) => setInviteTargetId(e.target.value)}
-                                    placeholder="Enter User ID..."
-                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-[#7f19e6] focus:ring-1 focus:ring-[#7f19e6] outline-none transition-colors"
-                                    autoFocus
-                                />
-                            </div>
-                            <div className="flex gap-3 mt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowInviteModal(false)}
-                                    className="flex-1 py-2.5 rounded-lg bg-white/5 text-white font-medium hover:bg-white/10 transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={!inviteTargetId.trim()}
-                                    className="flex-1 py-2.5 rounded-lg bg-[#7f19e6] text-white font-bold hover:bg-[#6d14c4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Send Invite
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            <InviteUserModal
+                isOpen={showInviteModal}
+                onClose={() => setShowInviteModal(false)}
+                onInvite={handleInviteUser}
+            />
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 lg:p-6 overflow-hidden">
@@ -230,113 +157,29 @@ export default function RandomChatPage() {
                 {/* Video Area */}
                 <div className="flex-1 relative flex flex-col justify-end items-center bg-black/50 rounded-xl overflow-hidden border border-white/10">
 
-                    {/* Pending Match Overlay */}
-                    {callState === 'proposed' && currentPeer && (
-                        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
-                            <h3 className="text-2xl font-bold text-white mb-6">Match Found!</h3>
+                    <MatchOverlay
+                        callState={callState}
+                        currentPeer={currentPeer}
+                        countdown={countdown}
+                        hasAccepted={hasAccepted}
+                        onAccept={acceptMatch}
+                        onSkip={handleSkipPending}
+                        setHasAccepted={setHasAccepted}
+                    />
 
-                            <div className="relative mb-8">
-                                <div className="w-32 h-32 rounded-full border-4 border-[#7f19e6] overflow-hidden bg-gray-800">
-                                    <img
-                                        src={currentPeer.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentPeer.id}`}
-                                        alt="Peer Avatar"
-                                        className="w-full h-full object-cover"
-                                    />
-                                </div>
-                                <div className="absolute -bottom-2 -right-2 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-yellow-500/30 flex items-center gap-1">
-                                    <span className="text-yellow-400 text-sm font-bold">★ {currentPeer.reputation || 100}</span>
-                                </div>
-                            </div>
+                    <ConnectingOverlay
+                        callState={callState}
+                        onAbort={abortCall}
+                        onRetry={findMatch}
+                    />
 
-                            <p className="text-white/60 mb-8 max-w-xs">
-                                Connecting automatically in <span className="text-white font-bold">{countdown}s</span>...
-                            </p>
+                    <VideoGrid
+                        participants={participants}
+                        remoteStreams={remoteStreams}
+                        callState={callState}
+                    />
 
-                            <div className="flex gap-4 w-full max-w-xs">
-                                <button
-                                    onClick={handleSkipPending}
-                                    className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition-colors"
-                                >
-                                    Skip
-                                </button>
-                                <button
-                                    onClick={acceptMatch}
-                                    className="flex-1 py-3 rounded-xl bg-[#7f19e6] text-white font-bold hover:bg-[#6d14c4] transition-colors shadow-lg shadow-[#7f19e6]/20"
-                                >
-                                    Connect Now
-                                </button>
-                            </div>
-                        </div>
-                    )}
 
-                    {/* Connecting Overlay */}
-                    {callState === 'connecting' && (
-                        <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
-                            <div className="animate-spin w-12 h-12 border-4 border-[#7f19e6] border-t-transparent rounded-full mb-4"></div>
-                            <h3 className="text-xl font-bold text-white mb-2">Connecting...</h3>
-                            <p className="text-white/50 text-sm mb-6">Establishing secure connection</p>
-
-                            {/* Manual Retry / Cancel if taking too long */}
-                            <button
-                                onClick={() => {
-                                    abortCall();
-                                    findMatch();
-                                }}
-                                className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-colors text-sm"
-                            >
-                                Cancel & Retry
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Remote Videos Grid - Hidden while pending match to prevent spoilers */}
-                    <div className={`absolute inset-0 w-full h-full bg-[#1a1a1a] p-4 grid gap-4 ${participants.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${callState === 'proposed' ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
-                        {participants.length > 0 ? (
-                            participants.map((participant) => (
-                                <div key={participant.id} className="relative w-full h-full bg-black rounded-lg overflow-hidden flex items-center justify-center border border-white/10 group">
-                                    {/* Remote Video Element */}
-                                    <RemoteVideo
-                                        stream={remoteStreams[participant.id]}
-                                        isMuted={participant.isMuted}
-                                        isVideoOff={participant.isVideoOff}
-                                        avatarUrl={participant.avatarUrl}
-                                        displayName={participant.displayName}
-                                    />
-
-                                    {/* Reputation Badge */}
-                                    {participant.reputation !== undefined && (
-                                        <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-yellow-500/30 flex items-center gap-2 z-20">
-                                            <span className="text-yellow-400 text-xs font-bold">★ {participant.reputation}</span>
-                                        </div>
-                                    )}
-
-                                    <div className="absolute bottom-4 left-4 text-white font-medium z-20 bg-black/50 px-2 py-1 rounded backdrop-blur-sm">
-                                        {participant.displayName}
-                                    </div>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full gap-4">
-                                <div className="animate-spin w-8 h-8 border-4 border-[#7f19e6] border-t-transparent rounded-full"></div>
-                                <p className="text-white/50">Searching for a match...</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Tags Overlay */}
-                    <div className="absolute top-4 left-4 flex gap-2 z-20">
-                        {['USA', 'English', 'Gaming'].map(tag => (
-                            <div key={tag} className="flex h-8 items-center justify-center rounded-lg bg-black/30 backdrop-blur-sm px-3 text-white border border-white/5">
-                                <p className="text-sm font-medium">{tag}</p>
-                            </div>
-                        ))}
-                        <div className="flex h-8 items-center justify-center rounded-lg bg-red-500/20 backdrop-blur-sm px-3 text-red-400 border border-red-500/20 animate-pulse">
-                            <p className="text-sm font-bold flex items-center gap-2">
-                                <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                                {userCount} LIVE
-                            </p>
-                        </div>
-                    </div>
 
                     {/* Local Video */}
                     <div className="absolute top-4 right-4 w-32 sm:w-40 md:w-56 aspect-[4/3] z-20">
@@ -350,132 +193,29 @@ export default function RandomChatPage() {
                         </div>
                     )}
 
-                    {/* Controls */}
-                    <div className="relative mb-6 flex justify-center z-10">
-                        <div className="flex items-center gap-3 rounded-xl bg-black/40 backdrop-blur-xl p-2 border border-white/10 shadow-2xl">
-                            <button
-                                onClick={toggleMic}
-                                className={`p-3 rounded-lg transition-colors ${isMuted ? 'bg-red-500/20 text-red-500' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
-                                title={isMuted ? "Unmute" : "Mute"}
-                            >
-                                {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
-                            </button>
-
-                            {/* Camera Toggle - Disabled (Always On) */}
-                            <button
-                                disabled
-                                className="p-3 rounded-lg text-white/40 cursor-not-allowed"
-                                title="Camera is always on"
-                            >
-                                <Video size={24} />
-                            </button>
-
-                            {/* Screen Share */}
-                            <button
-                                onClick={toggleScreenShare}
-                                className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                                title="Share Screen"
-                            >
-                                <Monitor size={24} />
-                            </button>
-                            <Link href="/dashboard">
-                                <button className="p-3 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors mx-2">
-                                    <PhoneOff size={24} />
-                                </button>
-                            </Link>
-                            <button
-                                onClick={() => setShowInviteModal(true)}
-                                className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                                title="Add User"
-                            >
-                                <UserPlus size={24} />
-                            </button>
-                            <button
-                                onClick={handleSkip}
-                                className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                                title="Skip"
-                            >
-                                <SkipForward size={24} />
-                            </button>
-
-                            <div className="w-px h-6 bg-white/20 mx-1"></div>
-
-                            {/* Add Friend Button (Visible after 3 mins) */}
-                            {canAddFriend && (
-                                <button
-                                    onClick={handleAddFriend}
-                                    className="p-3 rounded-lg text-green-400 hover:bg-green-500/20 transition-colors animate-pulse"
-                                    title="Add Friend"
-                                >
-                                    <UserPlus size={24} />
-                                </button>
-                            )}
-
-                            {/* Multi-user Add Button */}
-                            <button
-                                onClick={handleAddRandomUser}
-                                className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                                title="Add Random User"
-                            >
-                                <UserPlus size={24} />
-                            </button>
-
-                            {/* Chat Toggle */}
-                            <button
-                                onClick={() => setShowChat(!showChat)}
-                                className={`p-3 rounded-lg transition-colors ${showChat ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
-                                title="Toggle Chat"
-                            >
-                                <Send size={24} className={showChat ? "" : "opacity-50"} />
-                            </button>
-                        </div>
-                    </div>
+                    <Controls
+                        isMuted={isMuted}
+                        toggleMic={toggleMic}
+                        toggleScreenShare={toggleScreenShare}
+                        showChat={showChat}
+                        setShowChat={setShowChat}
+                        onSkip={handleSkip}
+                        onAddFriend={handleAddFriend}
+                        canAddFriend={canAddFriend}
+                        onInvite={() => setShowInviteModal(true)}
+                        onAddRandomUser={handleAddRandomUser}
+                    />
                 </div>
 
-                {/* Chat Area */}
-                {showChat && (
-                    <div className="w-full lg:w-[360px] flex-shrink-0 flex flex-col bg-[#191121]/50 rounded-xl overflow-hidden border border-white/10 h-[300px] lg:h-auto transition-all duration-300">
-                        <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
-                            {messages.map((msg, idx) => (
-                                <div key={idx} className={`flex items-end gap-3 ${msg.senderId === user?.id ? 'justify-end' : ''}`}>
-                                    {msg.senderId !== user?.id && !msg.isSystem && (
-                                        <div className="w-8 h-8 rounded-full bg-gray-600 flex-shrink-0" />
-                                    )}
-                                    <div className={`flex flex-col gap-1 ${msg.senderId === user?.id ? 'items-end' : 'items-start'} ${msg.isSystem ? 'w-full items-center' : ''}`}>
-                                        {!msg.isSystem && <p className="text-white/60 text-[13px] font-medium">{msg.senderName}</p>}
-                                        <div className={`max-w-[240px] rounded-lg px-3 py-2 text-white text-sm ${msg.isSystem ? 'bg-white/5 text-xs text-center italic' : (msg.senderId === user?.id ? 'bg-[#7f19e6]' : 'bg-white/10')}`}>
-                                            {msg.text}
-                                        </div>
-                                    </div>
-                                    {msg.senderId === user?.id && !msg.isSystem && (
-                                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-[#7f19e6] to-blue-500 flex-shrink-0" />
-                                    )}
-                                </div>
-                            ))}
-                            <div ref={messagesEndRef} />
-                        </div>
-
-                        <div className="p-4 border-t border-white/10 bg-[#191121]">
-                            <form onSubmit={handleSendMessage} className="flex items-center gap-2 rounded-lg bg-white/5 px-3 border border-white/10 focus-within:border-[#7f19e6]/50 transition-colors">
-                                <input
-                                    className="flex-1 bg-transparent text-white placeholder:text-white/50 text-sm border-0 focus:ring-0 p-0 h-10"
-                                    placeholder={currentPeerId ? "Send a message..." : "Waiting for match..."}
-                                    type="text"
-                                    value={inputMessage}
-                                    onChange={(e) => setInputMessage(e.target.value)}
-                                    disabled={!currentPeerId}
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={!currentPeerId || !inputMessage.trim()}
-                                    className="p-2 text-white/70 hover:text-[#7f19e6] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <Send size={20} />
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                )}
+                <ChatArea
+                    showChat={showChat}
+                    messages={messages}
+                    user={user}
+                    inputMessage={inputMessage}
+                    setInputMessage={setInputMessage}
+                    onSendMessage={handleSendMessage}
+                    currentPeerId={currentPeerId}
+                />
 
             </main>
         </div>

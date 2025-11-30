@@ -1,11 +1,13 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Model } from 'mongoose';
 
-export interface IUser extends Document {
+// Plain interface for frontend and general use
+export interface IUser {
+    _id: string;
+    id?: string; // For backward compatibility
     email: string;
-    password?: string;
     privateId: string;
-    displayName?: string; // Kept for backward compatibility, maps to username/name
-    username: string;
+    displayName?: string;
+    username?: string;
     phone?: string;
 
     // Profile visuals
@@ -100,8 +102,13 @@ export interface IUser extends Document {
     isBanned: boolean;
 
     reputationScore: number;
-    createdAt: Date;
-    updatedAt: Date;
+    createdAt: string | Date;
+    updatedAt: string | Date;
+}
+
+// Mongoose Document interface
+export interface UserDocument extends Omit<IUser, '_id'>, Document {
+    _id: any; // Override to allow string or ObjectId
 }
 
 const UserSchema: Schema = new Schema({
@@ -109,7 +116,7 @@ const UserSchema: Schema = new Schema({
     password: { type: String, required: true },
     privateId: { type: String, required: true, unique: true },
     displayName: { type: String },
-    username: { type: String, unique: true, sparse: true }, // sparse allows null/undefined to be unique
+    username: { type: String, unique: true, sparse: true },
     phone: { type: String },
 
     avatarUrl: { type: String },
@@ -194,4 +201,5 @@ const UserSchema: Schema = new Schema({
     updatedAt: { type: Date, default: Date.now }
 }, { timestamps: true });
 
-export const User = mongoose.model<IUser>('User', UserSchema);
+// Check if the model is already defined to prevent OverwriteModelError
+export const UserModel = mongoose.models.User || mongoose.model<UserDocument>('User', UserSchema);

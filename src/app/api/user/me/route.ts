@@ -59,3 +59,59 @@ export async function GET(req: Request) {
         );
     }
 }
+
+export async function PUT(req: Request) {
+    try {
+        await dbConnect();
+
+        // 1. Auth Check
+        const authHeader = req.headers.get('authorization');
+        let userId = null;
+
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.split(' ')[1];
+            try {
+                const decoded: any = jwt.verify(token, JWT_SECRET);
+                userId = decoded.id;
+            } catch (err) {
+                return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+            }
+        } else {
+            userId = req.headers.get('x-user-id');
+        }
+
+        if (!userId) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+
+        // 2. Get Update Data
+        const body = await req.json();
+
+        // 3. Prevent updating sensitive fields
+        delete body.password;
+        delete body.email;
+        delete body.privateId;
+        delete body._id;
+        delete body.reputationScore; // Prevent self-boosting reputation
+
+        // 4. Update User
+        const updatedUser = await User.findByIdAndUpdate(
+            userId,
+            { $set: body },
+            { new: true, runValidators: true }
+        ).select('-password');
+
+        if (!updatedUser) {
+            return NextResponse.json({ message: 'User not found' }, { status: 404 });
+        }
+
+        return NextResponse.json(updatedUser, { status: 200 });
+
+    } catch (error: any) {
+        console.error('Update User error:', error);
+        return NextResponse.json(
+            { message: error.message || 'Failed to update user' },
+            { status: 500 }
+        );
+    }
+}

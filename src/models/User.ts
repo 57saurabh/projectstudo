@@ -202,6 +202,4 @@ const UserSchema: Schema = new Schema({
 }, { timestamps: true });
 
 // Check if the model is already defined to prevent OverwriteModelError
-// Check if the model is already defined to prevent OverwriteModelError
-// Check if the model is already defined to prevent OverwriteModelError
 export const UserModel = mongoose.models.User || mongoose.model<UserDocument>('User', UserSchema);

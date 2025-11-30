@@ -27,7 +27,11 @@ export const useSignaling = () => {
         if (!user) return;
 
         socketRef.current = io(SOCKET_URL, {
-            query: { userId: user._id, displayName: user.displayName }
+            query: {
+                userId: user._id,
+                displayName: user.displayName,
+                username: user.username
+            }
         });
 
         const socket = socketRef.current;
@@ -37,7 +41,7 @@ export const useSignaling = () => {
         });
 
         // Matchmaking Events
-        socket.on('match-proposed', ({ peerId, initiator, reputation, avatarUrl }) => {
+        socket.on('match-proposed', ({ peerId, initiator, reputation, avatarUrl, username, bio, country, language }) => {
             console.log('Match proposed:', peerId);
             setCallState('proposed');
             setInQueue(false);
@@ -45,12 +49,15 @@ export const useSignaling = () => {
             // Add participant as placeholder (waiting for accept)
             addParticipant({
                 id: peerId,
-                displayName: 'Stranger',
+                displayName: username || 'Stranger', // Show username initially
                 isMuted: false,
                 isVideoOff: false,
                 reputation,
                 avatarUrl,
-                shouldOffer: false // Wait for start-call
+                shouldOffer: false, // Wait for start-call
+                bio,
+                country,
+                language
             });
         });
 

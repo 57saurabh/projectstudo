@@ -5,8 +5,6 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import { SocketGateway } from './signaling/socket.gateway';
-import { AuthController } from './auth/auth.controller';
-import { UserController } from './user/user.controller';
 
 dotenv.config();
 
@@ -31,12 +29,6 @@ if (MONGO_URI) {
 } else {
     console.warn('⚠️ MONGO_URI not found in .env');
 }
-
-// Initialize Routes
-const authController = new AuthController();
-const userController = new UserController();
-app.use('/api/auth', authController.router);
-app.use('/api/user', userController.router);
 
 // Initialize WebSocket Gateway
 new SocketGateway(io);

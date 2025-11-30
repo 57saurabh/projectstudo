@@ -59,7 +59,7 @@ export default function ProfilePage() {
 
             const headers = token ? { Authorization: `Bearer ${token}` } : { 'x-user-id': user?._id || user?.id };
 
-            const response = await axios.put(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000'}/api/user/me`, formData, {
+            const response = await axios.put(`/api/user/me`, formData, {
                 headers
             });
 
@@ -78,7 +78,7 @@ export default function ProfilePage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#191121] text-white p-4 md:p-8">
+        <div className="relative min-h-screen bg-[#191121] text-white p-4 md:p-8">
             <div className="max-w-4xl mx-auto">
                 <h1 className="text-3xl font-bold mb-8">Edit Profile</h1>
 
@@ -107,12 +107,10 @@ export default function ProfilePage() {
                         </button>
 
                         {isCapturing && (
-                            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-                                <WebcamCapture
-                                    onCapture={handleAvatarCapture}
-                                    onCancel={() => setIsCapturing(false)}
-                                />
-                            </div>
+                            <WebcamCapture
+                                onCapture={handleAvatarCapture}
+                                onCancel={() => setIsCapturing(false)}
+                            />
                         )}
                     </div>
 

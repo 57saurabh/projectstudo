@@ -2,6 +2,7 @@ import { Server, Socket } from 'socket.io';
 import * as crypto from 'crypto';
 import { MatchmakingService } from '../matchmaking/matchmaking.service';
 import Message from '../chat/message.model';
+import { UserModel } from '../models/User';
 
 export class SocketGateway {
     private io: Server;
@@ -35,9 +36,11 @@ export class SocketGateway {
         this.io.on('connection', (socket: Socket) => {
             console.log(`User connected: ${socket.id}`);
 
-            // Store display name
+            // Store display name (prioritize username)
             const displayName = socket.handshake.query.displayName as string;
-            this.userNames.set(socket.id, displayName || 'Stranger');
+            const username = socket.handshake.query.username as string;
+            // Use username if available, otherwise fallback to displayName or 'Stranger'
+            this.userNames.set(socket.id, username || displayName || 'Stranger');
 
             // Initialize reputation if new
             if (!this.userReputations.has(socket.id)) {
@@ -106,18 +109,32 @@ export class SocketGateway {
                     const matchKey = [socket.id, match].sort().join(':');
                     this.pendingMatches.set(matchKey, new Set());
 
+                    // Fetch full user details for profile display
+                    const [socketUser, matchUser] = await Promise.all([
+                        UserModel.findById(socket.id).select('username bio country language'),
+                        UserModel.findById(match).select('username bio country language')
+                    ]);
+
                     // Notify both users with profile info (PROPOSED)
                     this.io.to(socket.id).emit('match-proposed', {
                         peerId: match,
                         initiator: true,
                         reputation: this.userReputations.get(match) || 100,
-                        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${match}`
+                        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${match}`,
+                        username: matchUser?.username || 'Stranger',
+                        bio: matchUser?.bio || '',
+                        country: matchUser?.country || '',
+                        language: matchUser?.language || ''
                     });
                     this.io.to(match).emit('match-proposed', {
                         peerId: socket.id,
                         initiator: false,
                         reputation: this.userReputations.get(socket.id) || 100,
-                        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${socket.id}`
+                        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${socket.id}`,
+                        username: socketUser?.username || 'Stranger',
+                        bio: socketUser?.bio || '',
+                        country: socketUser?.country || '',
+                        language: socketUser?.language || ''
                     });
                 }
             });

@@ -29,12 +29,15 @@ export async function POST(req: Request) {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
+        const privateId = uuidv4().slice(0, 8);
+        const generatedUsername = `user_${privateId}`;
 
         const user = await User.create({
             email,
             password: hashedPassword,
-            displayName,
-            privateId: uuidv4().slice(0, 8),
+            displayName: displayName || generatedUsername,
+            username: generatedUsername,
+            privateId,
             reputationScore: 100,
         });
 
