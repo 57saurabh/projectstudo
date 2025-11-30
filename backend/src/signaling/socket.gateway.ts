@@ -188,6 +188,93 @@ export class SocketGateway {
 
             // ... (inside initialize)
 
+            // Handle Invite User
+            socket.on('invite-user', (data) => {
+                const { target } = data;
+
+                // Guard: Can only invite if in an active match
+                if (!this.activeMatches.has(socket.id)) {
+                    socket.emit('error', { message: 'You must be in a call to invite others.' });
+                    return;
+                }
+
+                // Guard: Check if target exists and is online
+                if (!this.io.sockets.sockets.has(target)) {
+                    socket.emit('error', { message: 'User is not online.' });
+                    return;
+                }
+
+                // Guard: Check if target is already in a call
+                if (this.activeMatches.has(target)) {
+                    socket.emit('error', { message: 'User is already in another call.' });
+                    return;
+                }
+
+                const senderName = this.userNames.get(socket.id) || 'Stranger';
+
+                // Notify target of invite
+                this.io.to(target).emit('invite-received', {
+                    senderId: socket.id,
+                    senderName: senderName,
+                    avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${socket.id}`
+                });
+            });
+
+            // Handle Accept Invite
+            socket.on('accept-invite', (data) => {
+                const { senderId } = data;
+
+                // Verify sender is still in a call
+                if (!this.activeMatches.has(senderId)) {
+                    socket.emit('error', { message: 'The call is no longer active.' });
+                    return;
+                }
+
+                // Get all current participants in the sender's call
+                const participants = this.activeMatches.get(senderId)!;
+
+                // Add new user to everyone's active match list
+                participants.forEach(participantId => {
+                    this.activeMatches.get(participantId)!.add(socket.id);
+                    // Notify existing participants
+                    this.io.to(participantId).emit('user-joined', {
+                        peerId: socket.id,
+                        reputation: this.userReputations.get(socket.id) || 100,
+                        displayName: this.userNames.get(socket.id) || 'Stranger'
+                    });
+                });
+
+                // Add sender to new user's list (and others)
+                this.activeMatches.set(socket.id, new Set(participants));
+                this.activeMatches.get(socket.id)!.add(senderId); // Ensure sender is included
+
+                // Add new user to sender's list
+                this.activeMatches.get(senderId)!.add(socket.id);
+
+                // Notify new user of success and send list of existing peers
+                const existingPeers = Array.from(participants).map(pId => ({
+                    id: pId,
+                    displayName: this.userNames.get(pId) || 'Stranger',
+                    reputation: this.userReputations.get(pId) || 100
+                }));
+
+                // Add sender to the list if not already there (it should be in participants set if logic is correct, but let's be safe)
+                if (!participants.has(senderId)) {
+                    existingPeers.push({
+                        id: senderId,
+                        displayName: this.userNames.get(senderId) || 'Stranger',
+                        reputation: this.userReputations.get(senderId) || 100
+                    });
+                    // Also update state
+                    this.activeMatches.get(socket.id)!.add(senderId);
+                    this.activeMatches.get(senderId)!.add(socket.id);
+                }
+
+                socket.emit('join-success', { peers: existingPeers });
+            });
+
+            // ... (inside initialize)
+
             // Handle Chat Messages
             socket.on('chat-message', async (data) => {
                 const { target, message } = data;

@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useSelector } from 'react-redux';
-import { RootState } from './store';
+import { RootState } from '@/lib/store/store';
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const { isAuthenticated } = useSelector((state: RootState) => state.auth);

@@ -11,14 +11,17 @@ import RemoteVideo from '@/components/video/RemoteVideo';
 
 export default function RandomChatPage() {
     const { user } = useSelector((state: RootState) => state.auth);
-    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, acceptMatch, toggleMic, toggleCam, toggleScreenShare } = useWebRTC();
-    const { participants, messages, isMuted, isVideoOff, mediaError, remoteStreams, callState } = useCallStore();
+    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, acceptMatch, toggleMic, toggleCam, toggleScreenShare, inviteUser, acceptInvite, rejectInvite } = useWebRTC();
+    const { participants, messages, isMuted, isVideoOff, mediaError, remoteStreams, callState, pendingInvite } = useCallStore();
 
     const [inputMessage, setInputMessage] = useState('');
     const [userCount, setUserCount] = useState(0);
     const [showChat, setShowChat] = useState(true);
     const [canAddFriend, setCanAddFriend] = useState(false);
     const [countdown, setCountdown] = useState(30);
+    const [showInviteModal, setShowInviteModal] = useState(false);
+    const [inviteTargetId, setInviteTargetId] = useState('');
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // In random chat, we assume the first participant is the peer
@@ -107,6 +110,16 @@ export default function RandomChatPage() {
         alert('Searching for another user to add...');
     };
 
+    const handleInviteSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (inviteTargetId.trim()) {
+            inviteUser(inviteTargetId.trim());
+            setShowInviteModal(false);
+            setInviteTargetId('');
+            alert(`Invite sent to ${inviteTargetId}`);
+        }
+    };
+
     return (
         <div className="relative flex h-screen w-full flex-col bg-[#f7f6f8] dark:bg-[#191121] font-sans overflow-hidden">
             {/* Header */}
@@ -137,6 +150,75 @@ export default function RandomChatPage() {
                     </div>
                 </div>
             </header>
+
+            {/* Invite Received Modal */}
+            {pendingInvite && (
+                <div className="absolute inset-0 z-[60] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
+                    <h3 className="text-2xl font-bold text-white mb-4">Incoming Invite</h3>
+                    <div className="w-24 h-24 rounded-full border-4 border-[#7f19e6] overflow-hidden bg-gray-800 mb-4">
+                        <img
+                            src={pendingInvite.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${pendingInvite.senderId}`}
+                            alt="Sender Avatar"
+                            className="w-full h-full object-cover"
+                        />
+                    </div>
+                    <p className="text-white/80 mb-8 text-lg">
+                        <span className="font-bold text-white">{pendingInvite.senderName}</span> wants you to join their call.
+                    </p>
+                    <div className="flex gap-4 w-full max-w-xs">
+                        <button
+                            onClick={rejectInvite}
+                            className="flex-1 py-3 rounded-xl bg-white/10 text-white font-bold hover:bg-white/20 transition-colors"
+                        >
+                            Decline
+                        </button>
+                        <button
+                            onClick={() => acceptInvite(pendingInvite.senderId)}
+                            className="flex-1 py-3 rounded-xl bg-[#7f19e6] text-white font-bold hover:bg-[#6d14c4] transition-colors shadow-lg shadow-[#7f19e6]/20"
+                        >
+                            Accept
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Invite User Modal */}
+            {showInviteModal && (
+                <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-[#191121] border border-white/10 p-6 rounded-2xl w-full max-w-md shadow-2xl">
+                        <h3 className="text-xl font-bold text-white mb-4">Invite User</h3>
+                        <form onSubmit={handleInviteSubmit} className="flex flex-col gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-white/60 mb-1">User ID</label>
+                                <input
+                                    type="text"
+                                    value={inviteTargetId}
+                                    onChange={(e) => setInviteTargetId(e.target.value)}
+                                    placeholder="Enter User ID..."
+                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-[#7f19e6] focus:ring-1 focus:ring-[#7f19e6] outline-none transition-colors"
+                                    autoFocus
+                                />
+                            </div>
+                            <div className="flex gap-3 mt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowInviteModal(false)}
+                                    className="flex-1 py-2.5 rounded-lg bg-white/5 text-white font-medium hover:bg-white/10 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={!inviteTargetId.trim()}
+                                    className="flex-1 py-2.5 rounded-lg bg-[#7f19e6] text-white font-bold hover:bg-[#6d14c4] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Send Invite
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 lg:p-6 overflow-hidden">
@@ -285,6 +367,13 @@ export default function RandomChatPage() {
                                     <PhoneOff size={24} />
                                 </button>
                             </Link>
+                            <button
+                                onClick={() => setShowInviteModal(true)}
+                                className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                                title="Add User"
+                            >
+                                <UserPlus size={24} />
+                            </button>
                             <button
                                 onClick={handleSkip}
                                 className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"

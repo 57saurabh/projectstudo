@@ -7,6 +7,7 @@ export interface Participant {
     isVideoOff: boolean;
     reputation?: number;
     avatarUrl?: string;
+    shouldOffer?: boolean;
 }
 
 export interface ChatMessage {
@@ -15,6 +16,12 @@ export interface ChatMessage {
     text: string;
     timestamp: number;
     isSystem?: boolean;
+}
+
+export interface PendingInvite {
+    senderId: string;
+    senderName: string;
+    avatarUrl?: string;
 }
 
 interface CallState {
@@ -29,6 +36,8 @@ interface CallState {
     inQueue: boolean;
     inCall: boolean;
     isInitiator: boolean;
+
+    pendingInvite: PendingInvite | null;
 
     // User Status
     isMuted: boolean;
@@ -52,6 +61,8 @@ interface CallState {
     setInQueue: (inQueue: boolean) => void;
     setInCall: (inCall: boolean) => void;
     setIsInitiator: (isInitiator: boolean) => void;
+
+    setPendingInvite: (invite: PendingInvite | null) => void;
 
     toggleMute: () => void;
     toggleVideo: () => void;
@@ -84,6 +95,10 @@ export const useCallStore = create<CallState>((set) => ({
     messages: [],
 
     mediaError: null,
+
+    pendingInvite: null,
+
+    setPendingInvite: (invite) => set({ pendingInvite: invite }),
 
     setLocalStream: (stream) => set({ localStream: stream }),
     setMediaError: (error: string | null) => set({ mediaError: error }),
@@ -159,6 +174,7 @@ export const useCallStore = create<CallState>((set) => ({
         messages: [],
         isMuted: false,
         isVideoOff: false,
-        isScreenSharing: false
+        isScreenSharing: false,
+        pendingInvite: null
     })
 }));

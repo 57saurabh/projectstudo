@@ -10,7 +10,18 @@ const ICE_SERVERS = {
 };
 
 export const useWebRTC = () => {
-    const { socket, findMatch, sendMessage, skipMatch, addRandomUser, acceptMatch: signalAcceptMatch } = useSignaling();
+    const {
+        socket,
+        findMatch,
+        sendMessage,
+        skipMatch,
+        addRandomUser,
+        acceptMatch: signalAcceptMatch,
+        inviteUser,
+        acceptInvite,
+        rejectInvite
+    } = useSignaling();
+
     const {
         localStream,
         setLocalStream,
@@ -141,16 +152,21 @@ export const useWebRTC = () => {
 
     // React to Call State Changes (Start Call)
     useEffect(() => {
-        if (callState === 'connecting' && isInitiator) {
-            const peer = participants[0]; // Assuming 1-on-1 for now
-            if (peer) {
-                console.log('Initiating call to:', peer.id);
-                const pc = createPeerConnection(peer.id);
-                pc.createOffer().then(offer => {
-                    pc.setLocalDescription(offer);
-                    socket?.emit('offer', { target: peer.id, sdp: offer });
-                });
-            }
+        if (callState === 'connecting' || callState === 'connected') {
+            participants.forEach(peer => {
+                // Check if we should initiate connection to this peer
+                // Use shouldOffer flag from participant, fallback to isInitiator for legacy/single peer
+                const shouldInit = peer.shouldOffer ?? (participants.length === 1 && isInitiator);
+
+                if (shouldInit && !peerConnections.current[peer.id]) {
+                    console.log('Initiating call to:', peer.id);
+                    const pc = createPeerConnection(peer.id);
+                    pc.createOffer().then(offer => {
+                        pc.setLocalDescription(offer);
+                        socket?.emit('offer', { target: peer.id, sdp: offer });
+                    });
+                }
+            });
         }
     }, [callState, isInitiator, participants, createPeerConnection, socket]);
 
@@ -270,6 +286,9 @@ export const useWebRTC = () => {
         addRandomUser,
         acceptMatch,
         toggleMic,
-        toggleCam
+        toggleCam,
+        inviteUser,
+        acceptInvite,
+        rejectInvite
     };
 };

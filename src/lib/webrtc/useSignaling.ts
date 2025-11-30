@@ -13,12 +13,14 @@ export const useSignaling = () => {
         setRoomId,
         addParticipant,
         removeParticipant,
+        updateParticipant,
         addMessage,
         setInQueue,
         setInCall,
         setCallState,
         setIsInitiator,
-        resetCall
+        resetCall,
+        setPendingInvite
     } = useCallStore();
 
     useEffect(() => {
@@ -47,7 +49,8 @@ export const useSignaling = () => {
                 isMuted: false,
                 isVideoOff: false,
                 reputation,
-                avatarUrl
+                avatarUrl,
+                shouldOffer: false // Wait for start-call
             });
         });
 
@@ -55,7 +58,8 @@ export const useSignaling = () => {
             console.log('Starting call with:', peerId, 'Should offer:', shouldOffer);
             setCallState('connecting');
             setInCall(true);
-            setIsInitiator(shouldOffer);
+            setIsInitiator(shouldOffer); // Keep for legacy/single peer logic if needed, but rely on participant.shouldOffer
+            updateParticipant(peerId, { shouldOffer });
         });
 
         socket.on('match-cancelled', () => {
@@ -63,6 +67,50 @@ export const useSignaling = () => {
             resetCall();
             // Auto-search again?
             findMatch();
+        });
+
+        // Invite Events
+        socket.on('invite-received', (data) => {
+            console.log('Invite received:', data);
+            setPendingInvite(data);
+        });
+
+        socket.on('user-joined', (data) => {
+            console.log('User joined:', data);
+            addParticipant({
+                id: data.peerId,
+                displayName: data.displayName,
+                isMuted: false,
+                isVideoOff: false,
+                reputation: data.reputation,
+                avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.peerId}`,
+                shouldOffer: false // Existing users wait for offer
+            });
+            addMessage({
+                senderId: 'system',
+                senderName: 'System',
+                text: `${data.displayName} joined the call.`,
+                timestamp: Date.now(),
+                isSystem: true
+            });
+        });
+
+        socket.on('join-success', (data) => {
+            console.log('Joined call successfully:', data);
+            setCallState('connected');
+            setInCall(true);
+
+            data.peers.forEach((peer: any) => {
+                addParticipant({
+                    id: peer.id,
+                    displayName: peer.displayName,
+                    isMuted: false,
+                    isVideoOff: false,
+                    reputation: peer.reputation,
+                    avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${peer.id}`,
+                    shouldOffer: true // Newcomer initiates to everyone
+                });
+            });
         });
 
         // Chat Events
@@ -112,6 +160,23 @@ export const useSignaling = () => {
         socketRef.current.emit('accept-match', { target: targetId });
     }, []);
 
+    const inviteUser = useCallback((targetId: string) => {
+        if (!socketRef.current) return;
+        console.log('Inviting user:', targetId);
+        socketRef.current.emit('invite-user', { target: targetId });
+    }, []);
+
+    const acceptInvite = useCallback((senderId: string) => {
+        if (!socketRef.current) return;
+        console.log('Accepting invite from:', senderId);
+        socketRef.current.emit('accept-invite', { senderId });
+        setPendingInvite(null);
+    }, []);
+
+    const rejectInvite = useCallback(() => {
+        setPendingInvite(null);
+    }, []);
+
     const sendMessage = useCallback((targetId: string, text: string) => {
         if (!socketRef.current || !user) return;
 
@@ -134,6 +199,8 @@ export const useSignaling = () => {
 
     const addRandomUser = useCallback(() => {
         console.log('Requesting to add random user...');
+        // Logic to pick a random online user and invite them?
+        // For now, let's just assume we have a UI to pick a user.
     }, []);
 
     const getOnlineUsers = useCallback(() => {
@@ -144,6 +211,9 @@ export const useSignaling = () => {
         socket: socketRef.current,
         findMatch,
         acceptMatch,
+        inviteUser,
+        acceptInvite,
+        rejectInvite,
         sendMessage,
         skipMatch,
         addRandomUser,
