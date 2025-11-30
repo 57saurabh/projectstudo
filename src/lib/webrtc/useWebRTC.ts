@@ -103,6 +103,24 @@ export const useWebRTC = () => {
             }
         };
 
+        pc.onconnectionstatechange = () => {
+            console.log(`Connection state with ${peerId}:`, pc.connectionState);
+            if (pc.connectionState === 'connected') {
+                useCallStore.getState().setCallState('connected');
+            }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            console.log(`ICE Connection state with ${peerId}:`, pc.iceConnectionState);
+            if (pc.iceConnectionState === 'connected' || pc.iceConnectionState === 'completed') {
+                useCallStore.getState().setCallState('connected');
+            } else if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+                console.warn(`ICE connection failed/disconnected with ${peerId}`);
+                useCallStore.getState().setMediaError(`Connection failed with peer. Retrying...`);
+                // Optional: Trigger a restart or notify user
+            }
+        };
+
         return pc;
     }, [localStream, socket]);
 
@@ -153,6 +171,12 @@ export const useWebRTC = () => {
     // React to Call State Changes (Start Call)
     useEffect(() => {
         if (callState === 'connecting' || callState === 'connected') {
+            // Guard: Wait for local stream before initiating to ensure tracks are added
+            if (!localStream) {
+                console.log('Waiting for local stream before initiating connection...');
+                return;
+            }
+
             participants.forEach(peer => {
                 // Check if we should initiate connection to this peer
                 // Use shouldOffer flag from participant, fallback to isInitiator for legacy/single peer
@@ -168,7 +192,7 @@ export const useWebRTC = () => {
                 }
             });
         }
-    }, [callState, isInitiator, participants, createPeerConnection, socket]);
+    }, [callState, isInitiator, participants, createPeerConnection, socket, localStream]);
 
     const acceptMatch = useCallback(async () => {
         const peer = participants[0];
@@ -276,6 +300,25 @@ export const useWebRTC = () => {
         }
     }, [localStream]);
 
+    const abortCall = useCallback(() => {
+        console.log('Aborting call and resetting state...');
+        // Stop all peer connections
+        Object.values(peerConnections.current).forEach(pc => pc.close());
+        peerConnections.current = {};
+
+        // Stop local stream tracks
+        if (streamRef.current) {
+            streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
+        }
+
+        // Reset global store state
+        useCallStore.getState().resetCall();
+
+        // Disconnect socket if needed (useSignaling handles this on unmount, but we can force emit leave)
+        // socket?.emit('leave-room'); // Optional if backend handles disconnect well
+    }, []);
+
     return {
         socket,
         localStream,
@@ -289,6 +332,7 @@ export const useWebRTC = () => {
         toggleCam,
         inviteUser,
         acceptInvite,
-        rejectInvite
+        rejectInvite,
+        abortCall
     };
 };

@@ -13,10 +13,24 @@ export default function RemoteVideo({ stream, isMuted, isVideoOff, avatarUrl, di
     const videoRef = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
-        if (videoRef.current && stream) {
-            videoRef.current.srcObject = stream;
-            videoRef.current.play().catch(e => console.log('Remote play error:', e));
+        const videoEl = videoRef.current;
+        if (videoEl && stream) {
+            videoEl.srcObject = stream;
+            videoEl.play().catch(e => {
+                if (e.name === 'AbortError') {
+                    // Ignore abort errors caused by component unmounting or source changing
+                    console.log('Remote video play aborted (harmless)');
+                } else {
+                    console.error('Remote video play error:', e);
+                }
+            });
         }
+
+        return () => {
+            if (videoEl) {
+                videoEl.srcObject = null;
+            }
+        };
     }, [stream]);
 
     return (

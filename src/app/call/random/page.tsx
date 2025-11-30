@@ -11,7 +11,7 @@ import RemoteVideo from '@/components/video/RemoteVideo';
 
 export default function RandomChatPage() {
     const { user } = useSelector((state: RootState) => state.auth);
-    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, acceptMatch, toggleMic, toggleCam, toggleScreenShare, inviteUser, acceptInvite, rejectInvite } = useWebRTC();
+    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, acceptMatch, toggleMic, toggleCam, toggleScreenShare, inviteUser, acceptInvite, rejectInvite, abortCall } = useWebRTC();
     const { participants, messages, isMuted, isVideoOff, mediaError, remoteStreams, callState, pendingInvite } = useCallStore();
 
     const [inputMessage, setInputMessage] = useState('');
@@ -51,7 +51,9 @@ export default function RandomChatPage() {
         if (callState === 'idle') {
             findMatch();
         }
+    }, [callState, findMatch]);
 
+    useEffect(() => {
         if (socket) {
             socket.on('user-count', (count: number) => {
                 setUserCount(count);
@@ -60,8 +62,10 @@ export default function RandomChatPage() {
 
         return () => {
             socket?.off('user-count');
+            // Abort call and reset state on unmount (route change)
+            abortCall();
         };
-    }, [findMatch, socket, callState]);
+    }, [socket, abortCall]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -269,7 +273,19 @@ export default function RandomChatPage() {
                     {callState === 'connecting' && (
                         <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
                             <div className="animate-spin w-12 h-12 border-4 border-[#7f19e6] border-t-transparent rounded-full mb-4"></div>
-                            <h3 className="text-xl font-bold text-white">Connecting...</h3>
+                            <h3 className="text-xl font-bold text-white mb-2">Connecting...</h3>
+                            <p className="text-white/50 text-sm mb-6">Establishing secure connection</p>
+
+                            {/* Manual Retry / Cancel if taking too long */}
+                            <button
+                                onClick={() => {
+                                    abortCall();
+                                    findMatch();
+                                }}
+                                className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg font-medium transition-colors text-sm"
+                            >
+                                Cancel & Retry
+                            </button>
                         </div>
                     )}
 

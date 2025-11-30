@@ -1,15 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import axios from 'axios';
+import { IUser as User } from '@/models/User';
 
 const API_URL = '/api/auth';
-
-interface User {
-    id: string;
-    email: string;
-    displayName?: string;
-    privateId: string;
-    reputationScore: number;
-}
 
 interface AuthState {
     user: User | null;
@@ -97,6 +90,9 @@ const authSlice = createSlice({
             state.user = action.payload.user;
             state.token = action.payload.token;
             state.isAuthenticated = true;
+        },
+        setUser: (state, action: PayloadAction<User>) => {
+            state.user = action.payload;
         }
     },
     extraReducers: (builder) => {
@@ -150,5 +146,5 @@ const authSlice = createSlice({
     },
 });
 
-export const { logout, loadUser } = authSlice.actions;
+export const { logout, loadUser, setUser } = authSlice.actions;
 export default authSlice.reducer;

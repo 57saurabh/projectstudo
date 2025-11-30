@@ -27,7 +27,7 @@ export const useSignaling = () => {
         if (!user) return;
 
         socketRef.current = io(SOCKET_URL, {
-            query: { userId: user.id, displayName: user.displayName }
+            query: { userId: user._id, displayName: user.displayName }
         });
 
         const socket = socketRef.current;
@@ -182,7 +182,7 @@ export const useSignaling = () => {
 
         socketRef.current.emit('chat-message', { target: targetId, message: text });
         addMessage({
-            senderId: user.id,
+            senderId: user._id,
             senderName: user.displayName || 'Me',
             text,
             timestamp: Date.now()

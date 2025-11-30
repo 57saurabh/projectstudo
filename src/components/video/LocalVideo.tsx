@@ -10,10 +10,23 @@ export default function LocalVideo() {
     const { user } = useSelector((state: RootState) => state.auth);
 
     useEffect(() => {
-        if (videoRef.current && localStream) {
-            videoRef.current.srcObject = localStream;
-            videoRef.current.play().catch(e => console.log('Play error:', e));
+        const videoEl = videoRef.current;
+        if (videoEl && localStream) {
+            videoEl.srcObject = localStream;
+            videoEl.play().catch(e => {
+                if (e.name === 'AbortError') {
+                    console.log('Local video play aborted (harmless)');
+                } else {
+                    console.error('Local video play error:', e);
+                }
+            });
         }
+
+        return () => {
+            if (videoEl) {
+                videoEl.srcObject = null;
+            }
+        };
     }, [localStream]);
 
     return (
