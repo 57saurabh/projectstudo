@@ -10,13 +10,17 @@ const ICE_SERVERS = {
 };
 
 export const useWebRTC = () => {
-    const { socket, findMatch, sendMessage, skipMatch, addRandomUser } = useSignaling();
+    const { socket, findMatch, sendMessage, skipMatch, addRandomUser, acceptMatch: signalAcceptMatch } = useSignaling();
     const {
         localStream,
         setLocalStream,
         setMediaError,
         addRemoteStream,
-        removeRemoteStream
+        removeRemoteStream,
+        callState,
+        isInitiator,
+        participants,
+        updateParticipant
     } = useCallStore();
 
     const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
@@ -55,16 +59,7 @@ export const useWebRTC = () => {
         initStream();
 
         return () => {
-            // Cleanup stream on unmount using the ref to avoid stale closures
-            // MOVED TO CameraGuard: We now persist the stream across call pages for better UX.
-            // The CameraGuard component ensures tracks are stopped when leaving /call/* routes.
-            /*
-            if (streamRef.current) {
-                streamRef.current.getTracks().forEach(track => track.stop());
-                streamRef.current = null;
-                setLocalStream(null);
-            }
-            */
+            // Cleanup logic handled by CameraGuard or manual reset
         };
     }, []);
 
@@ -100,10 +95,6 @@ export const useWebRTC = () => {
         return pc;
     }, [localStream, socket]);
 
-    const [pendingMatch, setPendingMatch] = useState<{ peerId: string; initiator: boolean; reputation?: number; avatarUrl?: string } | null>(null);
-
-    // ... (existing code)
-
     // Handle Signaling Events for WebRTC
     useEffect(() => {
         if (!socket) return;
@@ -135,15 +126,8 @@ export const useWebRTC = () => {
             await pc.addIceCandidate(new RTCIceCandidate(candidate));
         });
 
-        // Initiator logic (e.g., when match found)
-        socket.on('match-found', async ({ peerId, initiator, reputation, avatarUrl }) => {
-            // Instead of connecting immediately, set pending match
-            setPendingMatch({ peerId, initiator, reputation, avatarUrl });
-        });
-
         // Handle Media State Change
         socket.on('media-state-change', ({ sender, isMuted, isVideoOff }) => {
-            const { updateParticipant } = useCallStore.getState();
             updateParticipant(sender, { isMuted, isVideoOff });
         });
 
@@ -151,29 +135,37 @@ export const useWebRTC = () => {
             socket.off('offer');
             socket.off('answer');
             socket.off('ice-candidate');
-            socket.off('match-found');
             socket.off('media-state-change');
         };
-    }, [socket, createPeerConnection]);
+    }, [socket, createPeerConnection, updateParticipant]);
+
+    // React to Call State Changes (Start Call)
+    useEffect(() => {
+        if (callState === 'connecting' && isInitiator) {
+            const peer = participants[0]; // Assuming 1-on-1 for now
+            if (peer) {
+                console.log('Initiating call to:', peer.id);
+                const pc = createPeerConnection(peer.id);
+                pc.createOffer().then(offer => {
+                    pc.setLocalDescription(offer);
+                    socket?.emit('offer', { target: peer.id, sdp: offer });
+                });
+            }
+        }
+    }, [callState, isInitiator, participants, createPeerConnection, socket]);
 
     const acceptMatch = useCallback(async () => {
-        if (!pendingMatch || !socket) return;
-
-        const { peerId, initiator } = pendingMatch;
-
-        if (initiator) {
-            const pc = createPeerConnection(peerId);
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socket.emit('offer', { target: peerId, sdp: offer });
+        const peer = participants[0];
+        if (peer) {
+            signalAcceptMatch(peer.id);
         }
-
-        // Clear pending match as we are now connecting
-        setPendingMatch(null);
-    }, [pendingMatch, socket, createPeerConnection]);
+    }, [participants, signalAcceptMatch]);
 
     const handleSkipMatch = useCallback((peerId?: string) => {
-        setPendingMatch(null); // Clear pending match if skipping
+        // Stop all peer connections
+        Object.values(peerConnections.current).forEach(pc => pc.close());
+        peerConnections.current = {};
+
         skipMatch(peerId);
     }, [skipMatch]);
 
@@ -268,18 +260,15 @@ export const useWebRTC = () => {
         }
     }, [localStream]);
 
-    // ... (existing code)
-
     return {
         socket,
         localStream,
         findMatch,
         sendMessage,
-        skipMatch: handleSkipMatch, // Use wrapped skipMatch
+        skipMatch: handleSkipMatch,
         toggleScreenShare,
         addRandomUser,
-        pendingMatch, // Expose pending match
-        acceptMatch,   // Expose accept function
+        acceptMatch,
         toggleMic,
         toggleCam
     };

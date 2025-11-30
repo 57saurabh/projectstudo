@@ -25,8 +25,10 @@ interface CallState {
     // Call Status
     roomId: string | null;
     callType: 'random' | 'private' | 'group' | null;
+    callState: 'idle' | 'searching' | 'proposed' | 'connecting' | 'connected';
     inQueue: boolean;
     inCall: boolean;
+    isInitiator: boolean;
 
     // User Status
     isMuted: boolean;
@@ -46,8 +48,10 @@ interface CallState {
 
     setRoomId: (roomId: string | null) => void;
     setCallType: (type: 'random' | 'private' | 'group' | null) => void;
+    setCallState: (state: 'idle' | 'searching' | 'proposed' | 'connecting' | 'connected') => void;
     setInQueue: (inQueue: boolean) => void;
     setInCall: (inCall: boolean) => void;
+    setIsInitiator: (isInitiator: boolean) => void;
 
     toggleMute: () => void;
     toggleVideo: () => void;
@@ -67,8 +71,10 @@ export const useCallStore = create<CallState>((set) => ({
 
     roomId: null,
     callType: null,
+    callState: 'idle',
     inQueue: false,
     inCall: false,
+    isInitiator: false,
 
     isMuted: false,
     isVideoOff: false,
@@ -92,8 +98,10 @@ export const useCallStore = create<CallState>((set) => ({
 
     setRoomId: (roomId) => set({ roomId }),
     setCallType: (callType) => set({ callType }),
+    setCallState: (callState) => set({ callState }),
     setInQueue: (inQueue) => set({ inQueue }),
     setInCall: (inCall) => set({ inCall }),
+    setIsInitiator: (isInitiator) => set({ isInitiator }),
 
     toggleMute: () => set((state) => {
         if (state.localStream) {
@@ -143,8 +151,10 @@ export const useCallStore = create<CallState>((set) => ({
         remoteStreams: {},
         roomId: null,
         callType: null,
+        callState: 'idle',
         inQueue: false,
         inCall: false,
+        isInitiator: false,
         participants: [],
         messages: [],
         isMuted: false,

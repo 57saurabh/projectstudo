@@ -16,6 +16,8 @@ export const useSignaling = () => {
         addMessage,
         setInQueue,
         setInCall,
+        setCallState,
+        setIsInitiator,
         resetCall
     } = useCallStore();
 
@@ -33,17 +35,34 @@ export const useSignaling = () => {
         });
 
         // Matchmaking Events
-        socket.on('match-found', ({ peerId, roomId, initiator }) => {
-            console.log('Match found:', peerId);
-            setRoomId(roomId);
+        socket.on('match-proposed', ({ peerId, initiator, reputation, avatarUrl }) => {
+            console.log('Match proposed:', peerId);
+            setCallState('proposed');
             setInQueue(false);
-            setInCall(true);
+
+            // Add participant as placeholder (waiting for accept)
             addParticipant({
                 id: peerId,
                 displayName: 'Stranger',
                 isMuted: false,
-                isVideoOff: false
+                isVideoOff: false,
+                reputation,
+                avatarUrl
             });
+        });
+
+        socket.on('start-call', ({ peerId, shouldOffer }) => {
+            console.log('Starting call with:', peerId, 'Should offer:', shouldOffer);
+            setCallState('connecting');
+            setInCall(true);
+            setIsInitiator(shouldOffer);
+        });
+
+        socket.on('match-cancelled', () => {
+            console.log('Match cancelled by peer');
+            resetCall();
+            // Auto-search again?
+            findMatch();
         });
 
         // Chat Events
@@ -66,13 +85,11 @@ export const useSignaling = () => {
                 timestamp: Date.now(),
                 isSystem: true
             });
-            // If 1-on-1, maybe end call?
         });
 
         socket.on('force-disconnect', () => {
             console.log('Received force-disconnect. Resetting call and searching...');
             resetCall();
-            // Optional: Add a small delay or UI feedback before searching again
             setTimeout(() => {
                 findMatch();
             }, 1000);
@@ -85,7 +102,14 @@ export const useSignaling = () => {
 
     const findMatch = useCallback(() => {
         setInQueue(true);
+        setCallState('searching');
         socketRef.current?.emit('find-match');
+    }, []);
+
+    const acceptMatch = useCallback((targetId: string) => {
+        if (!socketRef.current) return;
+        console.log('Accepting match with:', targetId);
+        socketRef.current.emit('accept-match', { target: targetId });
     }, []);
 
     const sendMessage = useCallback((targetId: string, text: string) => {
@@ -109,8 +133,6 @@ export const useSignaling = () => {
     }, [findMatch]);
 
     const addRandomUser = useCallback(() => {
-        // Placeholder for multi-user logic
-        // socketRef.current?.emit('add-random-user');
         console.log('Requesting to add random user...');
     }, []);
 
@@ -121,6 +143,7 @@ export const useSignaling = () => {
     return {
         socket: socketRef.current,
         findMatch,
+        acceptMatch,
         sendMessage,
         skipMatch,
         addRandomUser,

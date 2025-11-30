@@ -11,8 +11,8 @@ import RemoteVideo from '@/components/video/RemoteVideo';
 
 export default function RandomChatPage() {
     const { user } = useSelector((state: RootState) => state.auth);
-    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, pendingMatch, acceptMatch, toggleMic, toggleCam, toggleScreenShare } = useWebRTC();
-    const { participants, messages, isMuted, isVideoOff, mediaError, remoteStreams } = useCallStore();
+    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, acceptMatch, toggleMic, toggleCam, toggleScreenShare } = useWebRTC();
+    const { participants, messages, isMuted, isVideoOff, mediaError, remoteStreams, callState } = useCallStore();
 
     const [inputMessage, setInputMessage] = useState('');
     const [userCount, setUserCount] = useState(0);
@@ -27,7 +27,7 @@ export default function RandomChatPage() {
 
     // Countdown logic for pending match
     useEffect(() => {
-        if (pendingMatch) {
+        if (callState === 'proposed') {
             setCountdown(30);
             const timer = setInterval(() => {
                 setCountdown((prev) => {
@@ -41,11 +41,13 @@ export default function RandomChatPage() {
             }, 1000);
             return () => clearInterval(timer);
         }
-    }, [pendingMatch, acceptMatch]);
+    }, [callState, acceptMatch]);
 
     useEffect(() => {
         // Auto-start searching when page loads
-        findMatch();
+        if (callState === 'idle') {
+            findMatch();
+        }
 
         if (socket) {
             socket.on('user-count', (count: number) => {
@@ -56,7 +58,7 @@ export default function RandomChatPage() {
         return () => {
             socket?.off('user-count');
         };
-    }, [findMatch, socket]);
+    }, [findMatch, socket, callState]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -64,7 +66,7 @@ export default function RandomChatPage() {
 
     // Friend Request Timer (3 minutes)
     useEffect(() => {
-        if (currentPeerId) {
+        if (callState === 'connected' && currentPeerId) {
             const timer = setTimeout(() => {
                 setCanAddFriend(true);
             }, 180000); // 3 minutes
@@ -73,7 +75,7 @@ export default function RandomChatPage() {
         } else {
             setCanAddFriend(false);
         }
-    }, [currentPeerId]);
+    }, [currentPeerId, callState]);
 
     const handleSendMessage = (e?: React.FormEvent) => {
         e?.preventDefault();
@@ -92,7 +94,7 @@ export default function RandomChatPage() {
     };
 
     const handleSkipPending = () => {
-        skipMatch(pendingMatch?.peerId);
+        skipMatch(currentPeerId);
     };
 
     const handleAddFriend = () => {
@@ -143,20 +145,20 @@ export default function RandomChatPage() {
                 <div className="flex-1 relative flex flex-col justify-end items-center bg-black/50 rounded-xl overflow-hidden border border-white/10">
 
                     {/* Pending Match Overlay */}
-                    {pendingMatch && (
+                    {callState === 'proposed' && currentPeer && (
                         <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center">
                             <h3 className="text-2xl font-bold text-white mb-6">Match Found!</h3>
 
                             <div className="relative mb-8">
                                 <div className="w-32 h-32 rounded-full border-4 border-[#7f19e6] overflow-hidden bg-gray-800">
                                     <img
-                                        src={pendingMatch.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${pendingMatch.peerId}`}
+                                        src={currentPeer.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentPeer.id}`}
                                         alt="Peer Avatar"
                                         className="w-full h-full object-cover"
                                     />
                                 </div>
                                 <div className="absolute -bottom-2 -right-2 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-yellow-500/30 flex items-center gap-1">
-                                    <span className="text-yellow-400 text-sm font-bold">★ {pendingMatch.reputation || 100}</span>
+                                    <span className="text-yellow-400 text-sm font-bold">★ {currentPeer.reputation || 100}</span>
                                 </div>
                             </div>
 
@@ -181,8 +183,16 @@ export default function RandomChatPage() {
                         </div>
                     )}
 
+                    {/* Connecting Overlay */}
+                    {callState === 'connecting' && (
+                        <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
+                            <div className="animate-spin w-12 h-12 border-4 border-[#7f19e6] border-t-transparent rounded-full mb-4"></div>
+                            <h3 className="text-xl font-bold text-white">Connecting...</h3>
+                        </div>
+                    )}
+
                     {/* Remote Videos Grid - Hidden while pending match to prevent spoilers */}
-                    <div className={`absolute inset-0 w-full h-full bg-[#1a1a1a] p-4 grid gap-4 ${participants.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${pendingMatch ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
+                    <div className={`absolute inset-0 w-full h-full bg-[#1a1a1a] p-4 grid gap-4 ${participants.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${callState === 'proposed' ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
                         {participants.length > 0 ? (
                             participants.map((participant) => (
                                 <div key={participant.id} className="relative w-full h-full bg-black rounded-lg overflow-hidden flex items-center justify-center border border-white/10 group">
