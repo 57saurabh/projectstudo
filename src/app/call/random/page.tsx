@@ -4,14 +4,14 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import { useWebRTC } from '@/lib/webrtc/useWebRTC';
 import { useCallStore } from '@/lib/store/useCallStore';
-import { Mic, MicOff, Video, VideoOff, PhoneOff, SkipForward, UserPlus, Flag, Send, Bell } from 'lucide-react';
+import { Mic, MicOff, Video, VideoOff, PhoneOff, SkipForward, UserPlus, Flag, Send, Bell, Monitor } from 'lucide-react';
 import Link from 'next/link';
 import LocalVideo from '@/components/video/LocalVideo';
 import RemoteVideo from '@/components/video/RemoteVideo';
 
 export default function RandomChatPage() {
     const { user } = useSelector((state: RootState) => state.auth);
-    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, pendingMatch, acceptMatch, toggleMic, toggleCam } = useWebRTC();
+    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, pendingMatch, acceptMatch, toggleMic, toggleCam, toggleScreenShare } = useWebRTC();
     const { participants, messages, isMuted, isVideoOff, mediaError, remoteStreams } = useCallStore();
 
     const [inputMessage, setInputMessage] = useState('');
@@ -181,8 +181,8 @@ export default function RandomChatPage() {
                         </div>
                     )}
 
-                    {/* Remote Videos Grid */}
-                    <div className={`absolute inset-0 w-full h-full bg-[#1a1a1a] p-4 grid gap-4 ${participants.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {/* Remote Videos Grid - Hidden while pending match to prevent spoilers */}
+                    <div className={`absolute inset-0 w-full h-full bg-[#1a1a1a] p-4 grid gap-4 ${participants.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} ${pendingMatch ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
                         {participants.length > 0 ? (
                             participants.map((participant) => (
                                 <div key={participant.id} className="relative w-full h-full bg-black rounded-lg overflow-hidden flex items-center justify-center border border-white/10 group">
@@ -248,14 +248,27 @@ export default function RandomChatPage() {
                             <button
                                 onClick={toggleMic}
                                 className={`p-3 rounded-lg transition-colors ${isMuted ? 'bg-red-500/20 text-red-500' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
+                                title={isMuted ? "Unmute" : "Mute"}
                             >
                                 {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
                             </button>
+
+                            {/* Camera Toggle - Disabled (Always On) */}
                             <button
-                                onClick={toggleCam}
-                                className={`p-3 rounded-lg transition-colors ${isVideoOff ? 'bg-red-500/20 text-red-500' : 'text-white/80 hover:bg-white/10 hover:text-white'}`}
+                                disabled
+                                className="p-3 rounded-lg text-white/40 cursor-not-allowed"
+                                title="Camera is always on"
                             >
-                                {isVideoOff ? <VideoOff size={24} /> : <Video size={24} />}
+                                <Video size={24} />
+                            </button>
+
+                            {/* Screen Share */}
+                            <button
+                                onClick={toggleScreenShare}
+                                className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                                title="Share Screen"
+                            >
+                                <Monitor size={24} />
                             </button>
                             <Link href="/dashboard">
                                 <button className="p-3 rounded-lg text-white bg-red-600 hover:bg-red-700 transition-colors mx-2">

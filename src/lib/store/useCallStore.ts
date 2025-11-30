@@ -97,16 +97,27 @@ export const useCallStore = create<CallState>((set) => ({
 
     toggleMute: () => set((state) => {
         if (state.localStream) {
-            state.localStream.getAudioTracks().forEach(track => track.enabled = !state.isMuted);
+            const tracks = state.localStream.getAudioTracks();
+            console.log('[useCallStore] Toggling mute. Current isMuted:', state.isMuted, 'Audio Tracks:', tracks.length);
+            tracks.forEach(track => {
+                track.enabled = state.isMuted; // If isMuted=true (currently muted), set enabled=true (unmute).
+                console.log('[useCallStore] Track', track.id, 'enabled set to:', track.enabled);
+            });
+        } else {
+            console.warn('[useCallStore] No local stream found when toggling mute');
         }
         return { isMuted: !state.isMuted };
     }),
     toggleVideo: () => set((state) => {
         if (state.localStream) {
-            // If currently OFF (true), we want to turn ON (enabled=true).
-            // If currently ON (false), we want to turn OFF (enabled=false).
-            // So enabled should match the CURRENT isVideoOff value (before toggle).
-            state.localStream.getVideoTracks().forEach(track => track.enabled = state.isVideoOff);
+            const tracks = state.localStream.getVideoTracks();
+            console.log('[useCallStore] Toggling video. Current isVideoOff:', state.isVideoOff, 'Video Tracks:', tracks.length);
+            tracks.forEach(track => {
+                track.enabled = state.isVideoOff; // If isVideoOff=true (currently off), set enabled=true (on).
+                console.log('[useCallStore] Track', track.id, 'enabled set to:', track.enabled);
+            });
+        } else {
+            console.warn('[useCallStore] No local stream found when toggling video');
         }
         return { isVideoOff: !state.isVideoOff };
     }),
