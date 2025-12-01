@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/db';
-import Message from '@backend/chat/message.model';
-import { User } from '@/models/User';
+import dbConnect from '@/lib/db';
+import Message from '@backend/src/chat/message.model';
+import { UserModel as User } from '@/models/User';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 export async function GET(req: NextRequest) {
     try {
-        await connectToDatabase();
+        await dbConnect();
 
         const token = req.headers.get('authorization')?.split(' ')[1];
         if (!token) {

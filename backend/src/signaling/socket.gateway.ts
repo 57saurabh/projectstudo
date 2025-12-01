@@ -51,6 +51,7 @@ export class SocketGateway {
 
             if (userId) {
                 this.socketToUserId.set(socket.id, userId);
+                socket.join(userId); // Join room named after userId for direct messaging
             }
 
             // Initialize reputation if new
@@ -297,8 +298,14 @@ export class SocketGateway {
             socket.on('chat-message', async (data) => {
                 const { target, message } = data;
 
-                // Guard: Only allow if active match
-                if (!this.activeMatches.get(socket.id)?.has(target)) return;
+                // Guard: Check if target room exists (user is online)
+                // Note: socket.to(userId) works even if user is offline (it just goes nowhere), 
+                // but we might want to know if they are online to handle "sent" vs "delivered" status.
+                // For now, we just emit. The client handles "delivered" via ack if we implemented it, 
+                // but for this MVP, we just send.
+
+                // We can check if the room has members if we really want to know:
+                // const isOnline = this.io.sockets.adapter.rooms.get(target)?.size > 0;
 
                 // Moderate Message
                 const filteredMessage = this.moderationService.filterContent(message);

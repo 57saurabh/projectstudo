@@ -49,6 +49,45 @@ export default function MessagesPage() {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setConversations(res.data);
+
+                // Check for userId query param to auto-open chat
+                const urlParams = new URLSearchParams(window.location.search);
+                const targetUserId = urlParams.get('userId');
+                if (targetUserId) {
+                    // Find existing conversation
+                    const existing = res.data.find((c: Conversation) => c._id === targetUserId);
+                    if (existing) {
+                        setActiveConversation(existing);
+                    } else {
+                        // If not found in existing, fetch user details and create temp conversation
+                        try {
+                            const userRes = await axios.get(`/api/users/${targetUserId}`, {
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            const newUser = userRes.data;
+                            const newConv: Conversation = {
+                                _id: newUser._id,
+                                user: {
+                                    displayName: newUser.displayName,
+                                    username: newUser.username,
+                                    avatarUrl: newUser.avatarUrl
+                                },
+                                lastMessage: {
+                                    text: '',
+                                    timestamp: new Date().toISOString(),
+                                    senderId: ''
+                                }
+                            };
+                            setConversations(prev => [newConv, ...prev]);
+                            setActiveConversation(newConv);
+                        } catch (err) {
+                            console.error('Failed to fetch user for new chat', err);
+                        }
+                    }
+                    // Clean URL
+                    window.history.replaceState({}, '', '/messages');
+                }
+
             } catch (error) {
                 console.error('Failed to fetch conversations', error);
             } finally {
@@ -157,14 +196,104 @@ export default function MessagesPage() {
     // Helper to decrypt if needed (frontend usually receives decrypted from API, but socket might be raw? 
     // Wait, socket sends raw text in 'chat-message' event from backend, so no decryption needed here)
 
+    const [showNewChatModal, setShowNewChatModal] = useState(false);
+    const [friends, setFriends] = useState<any[]>([]);
+
+    // Fetch Friends for New Chat
+    const fetchFriends = async () => {
+        if (!token) return;
+        try {
+            const res = await axios.get('/api/friends', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setFriends(res.data);
+        } catch (error) {
+            console.error('Failed to fetch friends', error);
+        }
+    };
+
+    const handleStartNewChat = () => {
+        fetchFriends();
+        setShowNewChatModal(true);
+    };
+
+    const selectFriendForChat = (friend: any) => {
+        // Check if conversation already exists
+        const existing = conversations.find(c => c._id === friend._id);
+        if (existing) {
+            setActiveConversation(existing);
+        } else {
+            // Create temporary conversation object
+            const newConv: Conversation = {
+                _id: friend._id,
+                user: {
+                    displayName: friend.displayName,
+                    username: friend.username,
+                    avatarUrl: friend.avatarUrl
+                },
+                lastMessage: {
+                    text: '',
+                    timestamp: new Date().toISOString(),
+                    senderId: ''
+                }
+            };
+            setConversations(prev => [newConv, ...prev]);
+            setActiveConversation(newConv);
+        }
+        setShowNewChatModal(false);
+    };
+
     return (
         <div className="p-4 lg:p-8 h-screen text-text-primary flex flex-col transition-colors duration-300 overflow-hidden">
-            <div className="mb-4">
+            <div className="mb-4 flex justify-between items-center">
                 <h1 className="text-2xl font-bold">Messages</h1>
+                <button
+                    onClick={handleStartNewChat}
+                    className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+                >
+                    New Chat
+                </button>
             </div>
 
-            <div className="flex flex-1 gap-6 overflow-hidden bg-surface border border-glass-border rounded-2xl shadow-xl">
-                
+            <div className="flex flex-1 gap-6 overflow-hidden bg-surface border border-glass-border rounded-2xl shadow-xl relative">
+
+                {/* New Chat Modal */}
+                {showNewChatModal && (
+                    <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                        <div className="bg-surface border border-glass-border rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl">
+                            <div className="p-4 border-b border-glass-border flex justify-between items-center">
+                                <h3 className="font-bold text-lg">Start New Chat</h3>
+                                <button onClick={() => setShowNewChatModal(false)} className="p-1 hover:bg-glass-bg rounded-full">
+                                    <ArrowLeft size={20} />
+                                </button>
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-2">
+                                {friends.length === 0 ? (
+                                    <div className="text-center p-8 text-text-secondary">No friends found. Add friends first!</div>
+                                ) : (
+                                    friends.map(friend => (
+                                        <button
+                                            key={friend._id}
+                                            onClick={() => selectFriendForChat(friend)}
+                                            className="w-full flex items-center gap-3 p-3 hover:bg-glass-bg rounded-xl transition-colors text-left"
+                                        >
+                                            <img
+                                                src={friend.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend._id}`}
+                                                alt={friend.displayName}
+                                                className="w-10 h-10 rounded-full bg-gray-700 object-cover"
+                                            />
+                                            <div>
+                                                <p className="font-medium">{friend.displayName}</p>
+                                                <p className="text-xs text-text-secondary">@{friend.username}</p>
+                                            </div>
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Chat List */}
                 <div className={`${activeConversation ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-col border-r border-glass-border bg-surface/50`}>
                     <div className="p-4 border-b border-glass-border">
@@ -177,7 +306,7 @@ export default function MessagesPage() {
                             />
                         </div>
                     </div>
-                    
+
                     <div className="flex-1 overflow-y-auto p-2 space-y-1">
                         {isLoading ? (
                             <div className="text-center p-4 text-text-secondary">Loading...</div>
@@ -185,13 +314,13 @@ export default function MessagesPage() {
                             <div className="text-center p-4 text-text-secondary">No conversations yet.</div>
                         ) : (
                             conversations.map((conv) => (
-                                <div 
-                                    key={conv._id} 
+                                <div
+                                    key={conv._id}
                                     onClick={() => setActiveConversation(conv)}
                                     className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${activeConversation?._id === conv._id ? 'bg-primary/10 border border-primary/20' : 'hover:bg-glass-bg border border-transparent'}`}
                                 >
-                                    <img 
-                                        src={conv.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv._id}`} 
+                                    <img
+                                        src={conv.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv._id}`}
                                         alt={conv.user.displayName}
                                         className="w-10 h-10 rounded-full bg-gray-700 object-cover"
                                     />
@@ -220,8 +349,8 @@ export default function MessagesPage() {
                             <button onClick={() => setActiveConversation(null)} className="md:hidden p-2 hover:bg-glass-bg rounded-full">
                                 <ArrowLeft size={20} />
                             </button>
-                            <img 
-                                src={activeConversation.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${activeConversation._id}`} 
+                            <img
+                                src={activeConversation.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${activeConversation._id}`}
                                 alt={activeConversation.user.displayName}
                                 className="w-10 h-10 rounded-full bg-gray-700 object-cover"
                             />
@@ -261,7 +390,7 @@ export default function MessagesPage() {
                                     placeholder="Type a message..."
                                     className="flex-1 bg-glass-bg border border-glass-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
                                 />
-                                <button 
+                                <button
                                     type="submit"
                                     disabled={!inputText.trim()}
                                     className="p-3 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"

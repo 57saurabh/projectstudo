@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/db';
-import Message from '@backend/chat/message.model';
+import dbConnect from '@/lib/db';
+import Message from '@backend/src/chat/message.model';
 import jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 
@@ -27,7 +27,7 @@ function decryptMessage(encryptedText: string): string {
 
 export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
     try {
-        await connectToDatabase();
+        await dbConnect();
 
         const token = req.headers.get('authorization')?.split(' ')[1];
         if (!token) {
