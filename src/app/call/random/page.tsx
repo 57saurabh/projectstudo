@@ -6,6 +6,7 @@ import { useWebRTC } from '@/lib/webrtc/useWebRTC';
 import { useCallStore } from '@/lib/store/useCallStore';
 import { useRouter } from 'next/navigation';
 import LocalVideo from '@/components/video/LocalVideo';
+import axios from 'axios';
 
 // Components
 import RandomChatHeader from '@/components/call/random/RandomChatHeader';
@@ -87,11 +88,16 @@ export default function RandomChatPage() {
     }, [socket, abortCall]);
 
     // Friend Request Timer (3 minutes)
+    // Auto-Friend Timer (90 seconds)
     useEffect(() => {
         if (callState === 'connected' && currentPeerId) {
             const timer = setTimeout(() => {
                 setCanAddFriend(true);
-            }, 180000); // 3 minutes
+                // Auto-trigger friend request logic
+                // In a real app, we might want to ask confirmation or just do it.
+                // User requested: "make them friend"
+                handleAddFriend(); 
+            }, 90000); // 90 seconds
 
             return () => clearTimeout(timer);
         } else {
@@ -119,9 +125,18 @@ export default function RandomChatPage() {
         skipMatch(currentPeerId);
     };
 
-    const handleAddFriend = () => {
-        // Mock friend request logic
-        alert('Friend request sent!');
+    const handleAddFriend = async () => {
+        if (!currentPeerId) return;
+        try {
+            // We use the existing API to send a friend request
+            // If both sides send it (which they will due to the timer), the backend should handle it as "Accept" if logic permits,
+            // or we rely on the user to accept the incoming request.
+            // For now, we'll send the request.
+            await axios.post('/api/friends', { targetId: currentPeerId });
+            alert('You have been connected for 90s! Friend request sent automatically.');
+        } catch (error) {
+            console.error('Failed to auto-add friend:', error);
+        }
     };
 
     const handleAddRandomUser = () => {

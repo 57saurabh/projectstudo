@@ -5,7 +5,8 @@ import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import { IUser as User } from '@/models/User';
 import WebcamCapture from '@/components/profile/WebcamCapture';
-import { Camera, Save, Loader2, User as UserIcon, Globe, Briefcase, Hash } from 'lucide-react';
+import { Camera, Save, Loader2, User as UserIcon, Globe, Briefcase, Hash, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 import axios from 'axios';
 import { setUser } from '@/lib/store/authSlice';
 
@@ -74,22 +75,26 @@ export default function ProfilePage() {
     };
 
     if (!user) {
-        return <div className="p-8 text-white">Please log in to view this page.</div>;
+        return <div className="p-8 text-text-primary">Please log in to view this page.</div>;
     }
 
     return (
-        <div className="relative min-h-screen bg-[#191121] text-white p-4 md:p-8">
+        <div className="relative min-h-screen bg-background text-text-primary p-4 md:p-8 transition-colors duration-300">
             <div className="max-w-4xl mx-auto">
+                <Link href="/settings" className="inline-flex items-center gap-2 text-text-secondary hover:text-primary transition-colors mb-6">
+                    <ArrowLeft size={20} />
+                    <span>Back to Settings</span>
+                </Link>
                 <h1 className="text-3xl font-bold mb-8">Edit Profile</h1>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {/* Left Column: Avatar */}
                     <div className="flex flex-col items-center gap-6">
-                        <div className="relative w-48 h-48 rounded-full overflow-hidden border-4 border-[#7f19e6] bg-black/50 group">
+                        <div className="relative w-48 h-48 rounded-full overflow-hidden border-4 border-primary bg-black/50 group">
                             {formData.avatarUrl ? (
                                 <img src={formData.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-white/20">
+                                <div className="w-full h-full flex items-center justify-center text-text-secondary">
                                     <UserIcon size={64} />
                                 </div>
                             )}
@@ -101,7 +106,7 @@ export default function ProfilePage() {
 
                         <button
                             onClick={() => setIsCapturing(true)}
-                            className="text-[#7f19e6] font-medium hover:text-[#6d14c4] transition-colors"
+                            className="text-primary font-medium hover:text-primary/80 transition-colors"
                         >
                             Change Profile Photo
                         </button>
@@ -125,100 +130,100 @@ export default function ProfilePage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-white/60">Display Name</label>
+                                    <label className="text-sm font-medium text-text-secondary">Display Name</label>
                                     <div className="relative">
-                                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} />
+                                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
                                         <input
                                             type="text"
                                             name="displayName"
                                             value={formData.displayName || ''}
                                             onChange={handleInputChange}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-[#7f19e6] focus:ring-1 focus:ring-[#7f19e6] outline-none transition-colors"
+                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                                             placeholder="Your Name"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-white/60">Username</label>
+                                    <label className="text-sm font-medium text-text-secondary">Username</label>
                                     <div className="relative">
-                                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} />
+                                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
                                         <input
                                             type="text"
                                             name="username"
                                             value={formData.username || ''}
                                             onChange={handleInputChange}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-[#7f19e6] focus:ring-1 focus:ring-[#7f19e6] outline-none transition-colors"
+                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                                             placeholder="username"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-2 md:col-span-2">
-                                    <label className="text-sm font-medium text-white/60">Bio</label>
+                                    <label className="text-sm font-medium text-text-secondary">Bio</label>
                                     <textarea
                                         name="bio"
                                         value={formData.bio || ''}
                                         onChange={handleInputChange}
                                         rows={3}
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-[#7f19e6] focus:ring-1 focus:ring-[#7f19e6] outline-none transition-colors resize-none"
+                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors resize-none"
                                         placeholder="Tell us about yourself..."
                                     />
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-white/60">Profession</label>
+                                    <label className="text-sm font-medium text-text-secondary">Profession</label>
                                     <div className="relative">
-                                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} />
+                                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
                                         <input
                                             type="text"
                                             name="profession"
                                             value={formData.profession || ''}
                                             onChange={handleInputChange}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-[#7f19e6] focus:ring-1 focus:ring-[#7f19e6] outline-none transition-colors"
+                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                                             placeholder="Software Engineer"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-white/60">Website</label>
+                                    <label className="text-sm font-medium text-text-secondary">Website</label>
                                     <div className="relative">
-                                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={18} />
+                                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
                                         <input
                                             type="text"
                                             name="website"
                                             value={formData.website || ''}
                                             onChange={handleInputChange}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg pl-10 pr-4 py-3 text-white focus:border-[#7f19e6] focus:ring-1 focus:ring-[#7f19e6] outline-none transition-colors"
+                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                                             placeholder="https://example.com"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-white/60">Gender</label>
+                                    <label className="text-sm font-medium text-text-secondary">Gender</label>
                                     <select
                                         name="gender"
                                         value={formData.gender || ''}
                                         onChange={handleInputChange}
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-[#7f19e6] focus:ring-1 focus:ring-[#7f19e6] outline-none transition-colors appearance-none"
+                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none"
                                     >
-                                        <option value="" className="bg-[#191121]">Select Gender</option>
-                                        <option value="male" className="bg-[#191121]">Male</option>
-                                        <option value="female" className="bg-[#191121]">Female</option>
-                                        <option value="other" className="bg-[#191121]">Other</option>
+                                        <option value="" className="bg-surface">Select Gender</option>
+                                        <option value="male" className="bg-surface">Male</option>
+                                        <option value="female" className="bg-surface">Female</option>
+                                        <option value="other" className="bg-surface">Other</option>
                                     </select>
                                 </div>
 
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-white/60">Age</label>
+                                    <label className="text-sm font-medium text-text-secondary">Age</label>
                                     <input
                                         type="number"
                                         name="age"
                                         value={formData.age || ''}
                                         onChange={handleInputChange}
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:border-[#7f19e6] focus:ring-1 focus:ring-[#7f19e6] outline-none transition-colors"
+                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                                         placeholder="25"
                                     />
                                 </div>
@@ -228,7 +233,7 @@ export default function ProfilePage() {
                                 <button
                                     type="submit"
                                     disabled={isLoading}
-                                    className="flex items-center gap-2 px-8 py-3 rounded-xl bg-[#7f19e6] text-white font-bold hover:bg-[#6d14c4] transition-colors shadow-lg shadow-[#7f19e6]/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="flex items-center gap-2 px-8 py-3 rounded-xl bg-primary text-white font-bold hover:opacity-90 transition-colors shadow-lg shadow-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     {isLoading ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}
                                     Save Changes

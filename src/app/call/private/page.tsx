@@ -21,23 +21,23 @@ export default function PrivateCallPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#f7f6f8] dark:bg-[#191121] text-white p-10 flex items-center justify-center">
+        <div className="min-h-screen bg-background text-text-primary p-10 flex items-center justify-center transition-colors duration-300">
             <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-10">
 
                 {/* Create Room Section */}
-                <div className="bg-[#141118] border border-white/10 rounded-3xl p-8 flex flex-col justify-between hover:border-[#7f19e6]/50 transition-colors group">
+                <div className="bg-surface border border-glass-border rounded-3xl p-8 flex flex-col justify-between hover:border-primary/50 transition-colors group">
                     <div>
-                        <div className="w-16 h-16 bg-[#7f19e6]/20 rounded-2xl flex items-center justify-center mb-6 text-[#7f19e6]">
+                        <div className="w-16 h-16 bg-primary/20 rounded-2xl flex items-center justify-center mb-6 text-primary">
                             <Phone size={32} />
                         </div>
                         <h2 className="text-3xl font-bold mb-4">Create Private Room</h2>
-                        <p className="text-white/50 mb-8">
+                        <p className="text-text-secondary mb-8">
                             Start a secure, encrypted video call. Share the link with a friend to invite them.
                         </p>
                     </div>
                     <button
                         onClick={createRoom}
-                        className="w-full py-4 bg-[#7f19e6] hover:bg-[#6d14c4] rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-primary hover:opacity-90 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-2 text-white"
                     >
                         <span>Create New Room</span>
                         <ArrowRight size={20} />
@@ -45,13 +45,13 @@ export default function PrivateCallPage() {
                 </div>
 
                 {/* Join Room Section */}
-                <div className="bg-[#141118] border border-white/10 rounded-3xl p-8 flex flex-col justify-between hover:border-blue-500/50 transition-colors">
+                <div className="bg-surface border border-glass-border rounded-3xl p-8 flex flex-col justify-between hover:border-blue-500/50 transition-colors">
                     <div>
                         <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mb-6 text-blue-500">
                             <Copy size={32} />
                         </div>
                         <h2 className="text-3xl font-bold mb-4">Join Existing Room</h2>
-                        <p className="text-white/50 mb-8">
+                        <p className="text-text-secondary mb-8">
                             Enter a room code to join an existing call.
                         </p>
                     </div>
@@ -61,7 +61,7 @@ export default function PrivateCallPage() {
                             placeholder="Enter Room Code"
                             value={roomId}
                             onChange={(e) => setRoomId(e.target.value)}
-                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-4 text-white focus:outline-none focus:border-blue-500 transition-colors"
+                            className="w-full bg-glass-bg border border-glass-border rounded-xl px-4 py-4 text-text-primary focus:outline-none focus:border-blue-500 transition-colors"
                         />
                         <button
                             type="submit"

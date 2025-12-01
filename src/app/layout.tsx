@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ReduxProvider } from "@/lib/store/ReduxProvider";
+import { ThemeProvider } from "@/lib/context/ThemeContext";
 import AuthGuard from "@/components/auth/AuthGuard";
 import AppLayout from "@/components/layout/AppLayout";
 import { CameraGuard } from '@/components/utils/CameraGuard';
@@ -23,13 +24,15 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} bg-background text-white min-h-screen overflow-hidden`}>
         <ReduxProvider>
-          <AuthInitializer />
-          <CameraGuard />
-          <AuthGuard>
-            <AppLayout>
-              {children}
-            </AppLayout>
-          </AuthGuard>
+          <ThemeProvider>
+            <AuthInitializer />
+            <CameraGuard />
+            <AuthGuard>
+              <AppLayout>
+                {children}
+              </AppLayout>
+            </AuthGuard>
+          </ThemeProvider>
         </ReduxProvider>
       </body>
     </html>

@@ -24,6 +24,11 @@ export interface IUser {
     // Social metrics
     followers: number;
     following: number;
+    friends: string[]; // Array of User IDs
+    connectedAccounts: {
+        youtube?: { connected: boolean; token?: string; channelId?: string };
+        instagram?: { connected: boolean; token?: string; accountId?: string };
+    };
 
     // Story system
     stories: Array<{
@@ -71,6 +76,7 @@ export interface IUser {
     age?: number;
     country?: string;
     language?: string;
+    theme?: 'light' | 'dark';
 
     // Status
     status: "online" | "offline" | "searching" | "in-call";
@@ -130,6 +136,19 @@ const UserSchema: Schema = new Schema({
 
     followers: { type: Number, default: 0 },
     following: { type: Number, default: 0 },
+    friends: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    connectedAccounts: {
+        youtube: {
+            connected: { type: Boolean, default: false },
+            token: String,
+            channelId: String
+        },
+        instagram: {
+            connected: { type: Boolean, default: false },
+            token: String,
+            accountId: String
+        }
+    },
 
     stories: [{
         id: String,
@@ -171,6 +190,7 @@ const UserSchema: Schema = new Schema({
     age: { type: Number },
     country: { type: String },
     language: { type: String },
+    theme: { type: String, enum: ['light', 'dark'], default: 'dark' },
 
     status: { type: String, enum: ["online", "offline", "searching", "in-call"], default: "offline" },
     lastActive: { type: Number, default: Date.now },

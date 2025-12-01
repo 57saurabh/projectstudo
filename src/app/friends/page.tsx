@@ -1,36 +1,122 @@
 'use client';
-import { useState } from 'react';
-import { Search, UserPlus, Phone, MessageSquare, MoreVertical, Circle } from 'lucide-react';
-import { motion } from 'framer-motion';
 
-// Mock Data
-const MOCK_FRIENDS = [
-    { id: '1', name: 'Sarah Connor', status: 'online', avatar: 'S' },
-    { id: '2', name: 'John Wick', status: 'offline', avatar: 'J' },
-    { id: '3', name: 'Tony Stark', status: 'busy', avatar: 'T' },
-    { id: '4', name: 'Bruce Wayne', status: 'online', avatar: 'B' },
-];
+import { useState, useEffect } from 'react';
+import { Search, UserPlus, MoreVertical, MessageSquare, Phone, Video, Users, Clock, Shield, Filter, Loader2, Check, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useSelector } from 'react-redux';
+import { RootState } from '@/lib/store/store';
+import axios from 'axios';
+import { IUser } from '@/models/User';
+
+interface FriendRequest {
+    _id: string;
+    sender: IUser;
+    receiver: string;
+    status: 'pending' | 'accepted' | 'rejected';
+    createdAt: string;
+}
 
 export default function FriendsPage() {
+    const [activeTab, setActiveTab] = useState<'all' | 'online' | 'pending' | 'blocked'>('all');
     const [searchQuery, setSearchQuery] = useState('');
-    const [activeTab, setActiveTab] = useState<'all' | 'online' | 'pending'>('all');
+    const [friends, setFriends] = useState<IUser[]>([]);
+    const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([]);
+    const [searchResults, setSearchResults] = useState<IUser[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isSearching, setIsSearching] = useState(false);
+    const { token, user } = useSelector((state: RootState) => state.auth);
 
-    const filteredFriends = MOCK_FRIENDS.filter(friend => {
-        if (activeTab === 'online' && friend.status !== 'online') return false;
-        return friend.name.toLowerCase().includes(searchQuery.toLowerCase());
+    useEffect(() => {
+        if (token) {
+            fetchFriends();
+            fetchPendingRequests();
+        }
+    }, [token]);
+
+    const fetchFriends = async () => {
+        try {
+            const res = await axios.get('/api/friends', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setFriends(res.data);
+        } catch (error) {
+            console.error('Failed to fetch friends', error);
+        }
+    };
+
+    const fetchPendingRequests = async () => {
+        try {
+            const res = await axios.get('/api/friends/requests', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setPendingRequests(res.data);
+        } catch (error) {
+            console.error('Failed to fetch requests', error);
+        }
+    };
+
+    const handleSearch = async (query: string) => {
+        setSearchQuery(query);
+        if (query.length < 3) {
+            setSearchResults([]);
+            return;
+        }
+
+        setIsSearching(true);
+        try {
+            const res = await axios.get(`/api/users/search?q=${query}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSearchResults(res.data);
+        } catch (error) {
+            console.error('Search failed', error);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const sendFriendRequest = async (receiverId: string) => {
+        try {
+            await axios.post('/api/friends', { receiverId }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            alert('Friend request sent!');
+            setSearchResults(prev => prev.filter(u => u._id !== receiverId));
+        } catch (error: any) {
+            alert(error.response?.data?.message || 'Failed to send request');
+        }
+    };
+
+    const handleRequestAction = async (requestId: string, action: 'accept' | 'reject') => {
+        try {
+            await axios.put(`/api/friends/requests/${requestId}`, { action }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            fetchPendingRequests();
+            if (action === 'accept') fetchFriends();
+        } catch (error) {
+            console.error('Action failed', error);
+        }
+    };
+
+    // Filter friends based on active tab
+    const filteredFriends = friends.filter(friend => {
+        if (activeTab === 'online') return friend.status === 'online';
+        // For 'all', return everyone. 'pending' and 'blocked' are handled separately.
+        return true;
     });
 
     return (
-        <div className="flex-1 flex flex-col h-screen bg-[#f7f6f8] dark:bg-[#191121] overflow-hidden p-6 lg:p-10">
+        <div className="flex-1 flex flex-col h-screen bg-background text-text-primary overflow-hidden p-6 lg:p-10 transition-colors duration-300">
             <div className="max-w-5xl w-full mx-auto flex flex-col h-full gap-6">
 
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Friends</h1>
-                        <p className="text-white/50">Manage your connections</p>
+                        <h1 className="text-3xl font-bold">Friends</h1>
+                        <p className="text-text-secondary">Manage your connections</p>
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-[#7f19e6] text-white rounded-xl font-medium hover:bg-[#6d14c4] transition-colors">
+                    <button className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors">
                         <UserPlus size={20} />
                         Add Friend
                     </button>
@@ -38,24 +124,55 @@ export default function FriendsPage() {
 
                 {/* Search & Tabs */}
                 <div className="flex flex-col md:flex-row gap-4">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" size={20} />
+                    {/* Add Friend Search */}
+                    <div className="relative group flex-1">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-primary transition-colors" size={20} />
                         <input
                             type="text"
-                            placeholder="Search friends..."
+                            placeholder="Find friends..."
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-[#141118] border border-white/10 rounded-xl py-3 pl-10 pr-4 text-white placeholder:text-white/40 focus:outline-none focus:border-[#7f19e6]/50 transition-colors"
+                            onChange={(e) => handleSearch(e.target.value)}
+                            className="w-full bg-surface border border-glass-border rounded-xl pl-12 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-text-secondary"
                         />
+                        
+                        {/* Search Results Dropdown */}
+                        {searchQuery.length >= 3 && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-glass-border rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto">
+                                {isSearching ? (
+                                    <div className="p-4 text-center text-text-secondary">Searching...</div>
+                                ) : searchResults.length > 0 ? (
+                                    searchResults.map(user => (
+                                        <div key={user._id} className="flex items-center justify-between p-3 hover:bg-glass-bg transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.displayName}`} alt={user.displayName} className="w-10 h-10 rounded-full" />
+                                                <div>
+                                                    <p className="font-medium text-text-primary">{user.displayName}</p>
+                                                    <p className="text-xs text-text-secondary">@{user.username}</p>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => sendFriendRequest(user._id)}
+                                                className="p-2 bg-primary/10 text-primary rounded-lg hover:bg-primary hover:text-white transition-colors"
+                                            >
+                                                <UserPlus size={18} />
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="p-4 text-center text-text-secondary">No users found</div>
+                                )}
+                            </div>
+                        )}
                     </div>
-                    <div className="flex bg-[#141118] p-1 rounded-xl border border-white/10">
+                    
+                    <div className="flex bg-surface p-1 rounded-xl border border-glass-border">
                         {['all', 'online', 'pending'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab as any)}
                                 className={`px-6 py-2 rounded-lg text-sm font-medium capitalize transition-all ${activeTab === tab
-                                        ? 'bg-[#7f19e6] text-white shadow-lg'
-                                        : 'text-white/60 hover:text-white'
+                                        ? 'bg-primary text-white shadow-lg'
+                                        : 'text-text-secondary hover:text-text-primary'
                                     }`}
                             >
                                 {tab}
@@ -66,49 +183,113 @@ export default function FriendsPage() {
 
                 {/* Friends List */}
                 <div className="flex-1 overflow-y-auto pr-2 space-y-3">
-                    {filteredFriends.map((friend, idx) => (
-                        <motion.div
-                            key={friend.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: idx * 0.05 }}
-                            className="flex items-center justify-between p-4 bg-[#141118] border border-white/5 rounded-2xl hover:border-white/10 transition-colors group"
-                        >
-                            <div className="flex items-center gap-4">
-                                <div className="relative">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-gray-700 to-gray-800 flex items-center justify-center font-bold text-lg text-white">
-                                        {friend.avatar}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {activeTab === 'pending' ? (
+                        pendingRequests.length > 0 ? (
+                            pendingRequests.map((req) => (
+                                <motion.div
+                                    key={req._id}
+                                    layout
+                                    initial={{ opacity: 0, scale: 0.9 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    className="bg-surface border border-glass-border rounded-2xl p-6 hover:border-primary/50 transition-all duration-300 group"
+                                >
+                                    <div className="flex items-start justify-between mb-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="relative">
+                                                <img
+                                                    src={req.sender.avatarUrl || `https://ui-avatars.com/api/?name=${req.sender.displayName}`}
+                                                    alt={req.sender.displayName}
+                                                    className="w-14 h-14 rounded-full object-cover border-2 border-surface group-hover:border-primary transition-colors"
+                                                />
+                                            </div>
+                                            <div>
+                                                <h3 className="font-bold text-lg text-text-primary">{req.sender.displayName}</h3>
+                                                <p className="text-primary text-sm">@{req.sender.username}</p>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-[#141118] ${friend.status === 'online' ? 'bg-green-500' :
-                                            friend.status === 'busy' ? 'bg-red-500' : 'bg-gray-500'
-                                        }`} />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-white text-lg">{friend.name}</h3>
-                                    <p className="text-white/40 text-sm capitalize">{friend.status}</p>
-                                </div>
+                                    <div className="flex gap-2 mt-4">
+                                        <button 
+                                            onClick={() => handleRequestAction(req._id, 'accept')}
+                                            className="flex-1 bg-primary text-white py-2 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                                        >
+                                            <Check size={18} /> Accept
+                                        </button>
+                                        <button 
+                                            onClick={() => handleRequestAction(req._id, 'reject')}
+                                            className="flex-1 bg-surface border border-glass-border text-text-primary py-2 rounded-lg font-medium hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <X size={18} /> Reject
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            ))
+                        ) : (
+                            <div className="col-span-full text-center py-12 text-text-secondary">
+                                No pending requests
                             </div>
+                        )
+                    ) : (
+                        filteredFriends.map((friend) => (
+                            <motion.div
+                                key={friend._id}
+                                layout
+                                initial={{ opacity: 0, scale: 0.9 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="bg-surface border border-glass-border rounded-2xl p-6 hover:border-primary/50 transition-all duration-300 group"
+                            >
+                                <div className="flex items-start justify-between mb-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="relative">
+                                            <img
+                                                src={friend.avatarUrl || `https://ui-avatars.com/api/?name=${friend.displayName}`}
+                                                alt={friend.displayName}
+                                                className="w-14 h-14 rounded-full object-cover border-2 border-surface group-hover:border-primary transition-colors"
+                                            />
+                                            <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-surface ${
+                                                friend.status === 'online' ? 'bg-green-500' :
+                                                friend.status === 'in-call' ? 'bg-red-500' :
+                                                'bg-gray-500'
+                                            }`} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-lg text-text-primary">{friend.displayName}</h3>
+                                            <p className="text-primary text-sm">@{friend.username}</p>
+                                        </div>
+                                    </div>
+                                    <button className="p-2 hover:bg-glass-bg rounded-lg text-text-secondary hover:text-primary transition-colors">
+                                        <MoreVertical size={20} />
+                                    </button>
+                                </div>
 
-                            <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-                                    <MessageSquare size={20} />
-                                </button>
-                                <button className="p-2 text-green-400 hover:text-green-300 hover:bg-green-500/10 rounded-lg transition-colors">
-                                    <Phone size={20} />
-                                </button>
-                                <button className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors">
-                                    <MoreVertical size={20} />
-                                </button>
-                            </div>
-                        </motion.div>
-                    ))}
+                                <div className="flex items-center gap-4 text-sm text-text-secondary mb-6">
+                                    <div className="flex items-center gap-1">
+                                        <Users size={14} />
+                                        <span>0 Mutual</span>
+                                    </div>
+                                    {friend.status === 'online' && (
+                                        <div className="flex items-center gap-1 text-green-500">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                            <span>Online</span>
+                                        </div>
+                                    )}
+                                </div>
 
-                    {filteredFriends.length === 0 && (
-                        <div className="flex flex-col items-center justify-center h-64 text-white/40">
-                            <Search size={48} className="mb-4 opacity-50" />
-                            <p>No friends found.</p>
-                        </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/10 text-primary font-medium hover:bg-primary hover:text-white transition-all duration-300">
+                                        <MessageSquare size={18} />
+                                        <span>Message</span>
+                                    </button>
+                                    <button className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-surface border border-glass-border text-text-primary font-medium hover:border-primary/50 transition-all duration-300">
+                                        <Video size={18} />
+                                        <span>Call</span>
+                                    </button>
+                                </div>
+                            </motion.div>
+                        ))
                     )}
+                </div>
                 </div>
             </div>
         </div>

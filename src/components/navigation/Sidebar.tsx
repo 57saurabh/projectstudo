@@ -39,7 +39,7 @@ export default function Sidebar() {
         { name: 'Friends', href: '/friends', icon: Users },
         { name: 'Groups', href: '/groups', icon: Video },
         { name: 'Messages', href: '/messages', icon: MessageSquare },
-        { name: 'Settings', href: '/settings/profile', icon: Settings },
+        { name: 'Settings', href: '/settings', icon: Settings },
     ];
 
     return (

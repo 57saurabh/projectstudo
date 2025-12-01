@@ -3,14 +3,17 @@ import * as crypto from 'crypto';
 import { MatchmakingService } from '../matchmaking/matchmaking.service';
 import Message from '../chat/message.model';
 import { UserModel } from '../models/User';
+import { ModerationService } from '../microservices/moderation/moderationService';
 
 export class SocketGateway {
     private io: Server;
     private matchmakingService: MatchmakingService;
+    private moderationService: ModerationService;
 
     constructor(io: Server) {
         this.io = io;
         this.matchmakingService = new MatchmakingService();
+        this.moderationService = new ModerationService();
         this.initialize();
     }
 
@@ -52,32 +55,7 @@ export class SocketGateway {
 
             // ... (get-online-users and find-match handlers remain same) ...
 
-            // Handle Chat Messages
-            socket.on('chat-message', async (data) => {
-                const { target, message } = data;
 
-                // 1. Relay to target (Real-time)
-                const senderName = this.userNames.get(socket.id) || 'Stranger';
-                socket.to(target).emit('chat-message', {
-                    senderId: socket.id,
-                    senderName: senderName,
-                    text: message
-                });
-
-                // 2. Persist to DB (Encrypted)
-                try {
-                    const encryptedText = this.encryptMessage(message);
-                    await Message.create({
-                        senderId: socket.id,
-                        receiverId: target,
-                        text: encryptedText,
-                        timestamp: new Date()
-                    });
-                    console.log('Message saved to DB (Encrypted)');
-                } catch (err) {
-                    console.error('Failed to save message:', err);
-                }
-            });
 
             // Handle Get Online Users
             socket.on('get-online-users', () => {
@@ -296,20 +274,23 @@ export class SocketGateway {
             socket.on('chat-message', async (data) => {
                 const { target, message } = data;
 
-                // Guard: Only allow if active match (or maybe proposed? No, only active)
+                // Guard: Only allow if active match
                 if (!this.activeMatches.get(socket.id)?.has(target)) return;
+
+                // Moderate Message
+                const filteredMessage = this.moderationService.filterContent(message);
 
                 // 1. Relay to target (Real-time)
                 const senderName = this.userNames.get(socket.id) || 'Stranger';
                 socket.to(target).emit('chat-message', {
                     senderId: socket.id,
                     senderName: senderName,
-                    text: message
+                    text: filteredMessage
                 });
 
                 // 2. Persist to DB (Encrypted)
                 try {
-                    const encryptedText = this.encryptMessage(message);
+                    const encryptedText = this.encryptMessage(filteredMessage);
                     await Message.create({
                         senderId: socket.id,
                         receiverId: target,
