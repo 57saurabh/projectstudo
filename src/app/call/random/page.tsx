@@ -8,6 +8,10 @@ import { useRouter } from 'next/navigation';
 import LocalVideo from '@/components/video/LocalVideo';
 import axios from 'axios';
 
+// AI Services
+import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
+import { moderationService } from '@/lib/ai/ModerationService';
+
 // Components
 import RandomChatHeader from '@/components/call/random/RandomChatHeader';
 import IncomingInvite from '@/components/call/random/IncomingInvite';
@@ -19,8 +23,8 @@ import Controls from '@/components/call/random/Controls';
 import ChatArea from '@/components/call/random/ChatArea';
 
 export default function RandomChatPage() {
-    const { user } = useSelector((state: RootState) => state.auth);
-    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, acceptMatch, toggleMic, toggleCam, toggleScreenShare, inviteUser, acceptInvite, rejectInvite, abortCall } = useWebRTC();
+    const { user, token } = useSelector((state: RootState) => state.auth);
+    const { findMatch, sendMessage, skipMatch, socket, addRandomUser, acceptMatch, toggleMic, toggleCam, toggleScreenShare, inviteUser, acceptInvite, rejectInvite, abortCall, localStream } = useWebRTC();
     const { participants, messages, isMuted, isVideoOff, mediaError, remoteStreams, callState, pendingInvite } = useCallStore();
 
     const [inputMessage, setInputMessage] = useState('');
@@ -31,9 +35,86 @@ export default function RandomChatPage() {
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [hasAccepted, setHasAccepted] = useState(false);
 
+    // Moderation State
+    const [faceWarning, setFaceWarning] = useState<string | null>(null);
+    const [nsfwWarning, setNsfwWarning] = useState<string | null>(null);
+    const analysisVideoRef = useRef<HTMLVideoElement>(null);
+    const lastFaceDetectedTime = useRef<number>(Date.now());
+    const isModelsLoaded = useRef<boolean>(false);
+
     // In random chat, we assume the first participant is the peer
     const currentPeer = participants[0];
     const currentPeerId = currentPeer?.id;
+
+    // Load AI Models
+    useEffect(() => {
+        const loadModels = async () => {
+            try {
+                await Promise.all([
+                    faceDetectionService.load(),
+                    moderationService.load()
+                ]);
+                isModelsLoaded.current = true;
+                console.log('AI Models loaded successfully');
+            } catch (err) {
+                console.error('Failed to load AI models:', err);
+            }
+        };
+        loadModels();
+    }, []);
+
+    // Analysis Loop
+    useEffect(() => {
+        if (!localStream || !analysisVideoRef.current || !isModelsLoaded.current) return;
+
+        const videoEl = analysisVideoRef.current;
+        videoEl.srcObject = localStream;
+        videoEl.play().catch(e => console.error('Analysis video play error:', e));
+
+        const interval = setInterval(async () => {
+            if (videoEl.paused || videoEl.ended || videoEl.readyState < 2) return;
+
+            const now = Date.now();
+
+            // 1. Face Detection
+            const faceResult = faceDetectionService.detect(videoEl, now);
+            if (faceResult && faceResult.faceLandmarks.length > 0) {
+                lastFaceDetectedTime.current = now;
+                setFaceWarning(null);
+            } else {
+                const timeSinceLastFace = now - lastFaceDetectedTime.current;
+                if (timeSinceLastFace > 45000) { // 45 seconds
+                    abortCall();
+                    alert('Call aborted: Face not visible for too long.');
+                } else if (timeSinceLastFace > 30000) { // 30 seconds
+                    setFaceWarning('Face not visible! Call will end soon.');
+                }
+            }
+
+            // 2. NSFW Detection
+            const predictions = await moderationService.checkContent(videoEl);
+            if (predictions) {
+                const safetyCheck = moderationService.isSafe(predictions);
+                if (!safetyCheck.safe) {
+                    setNsfwWarning(safetyCheck.reason || 'Inappropriate content detected');
+                    // Give a short delay before aborting to let user see warning? 
+                    // Or abort immediately for safety. User requested "warning then abort" for face, 
+                    // but for NSFW usually it's strict. 
+                    // User prompt: "client side modrator (in js) for nude,shirtless"
+                    // Let's abort immediately for NSFW to be safe.
+                    abortCall();
+                    alert(`Call aborted: ${safetyCheck.reason}`);
+                }
+            }
+
+        }, 1000); // Check every second
+
+        return () => {
+            clearInterval(interval);
+            videoEl.srcObject = null;
+        };
+    }, [localStream, abortCall]);
+
 
     // Countdown logic for pending match
     useEffect(() => {
@@ -96,7 +177,7 @@ export default function RandomChatPage() {
                 // Auto-trigger friend request logic
                 // In a real app, we might want to ask confirmation or just do it.
                 // User requested: "make them friend"
-                handleAddFriend(); 
+                handleAddFriend();
             }, 90000); // 90 seconds
 
             return () => clearTimeout(timer);
@@ -126,13 +207,15 @@ export default function RandomChatPage() {
     };
 
     const handleAddFriend = async () => {
-        if (!currentPeerId) return;
+        if (!currentPeer?.userId || !token) return;
         try {
             // We use the existing API to send a friend request
             // If both sides send it (which they will due to the timer), the backend should handle it as "Accept" if logic permits,
             // or we rely on the user to accept the incoming request.
             // For now, we'll send the request.
-            await axios.post('/api/friends', { targetId: currentPeerId });
+            await axios.post('/api/friends', { receiverId: currentPeer.userId }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             alert('You have been connected for 90s! Friend request sent automatically.');
         } catch (error) {
             console.error('Failed to auto-add friend:', error);
@@ -152,6 +235,9 @@ export default function RandomChatPage() {
 
     return (
         <div className="relative flex h-screen w-full flex-col bg-[#f7f6f8] dark:bg-[#191121] font-sans overflow-hidden">
+            {/* Hidden Video for Analysis */}
+            <video ref={analysisVideoRef} className="hidden" muted playsInline />
+
             <RandomChatHeader user={user} />
 
             <IncomingInvite
@@ -184,6 +270,7 @@ export default function RandomChatPage() {
 
                     <ConnectingOverlay
                         callState={callState}
+                        currentPeer={currentPeer}
                         onAbort={abortCall}
                         onRetry={findMatch}
                     />
@@ -194,12 +281,22 @@ export default function RandomChatPage() {
                         callState={callState}
                     />
 
-
-
                     {/* Local Video */}
                     <div className="absolute top-4 right-4 w-32 sm:w-40 md:w-56 aspect-[4/3] z-20">
                         <LocalVideo />
                     </div>
+
+                    {/* Warnings */}
+                    {faceWarning && (
+                        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 bg-yellow-500/90 text-black px-6 py-3 rounded-lg shadow-lg z-50 text-base font-bold animate-pulse">
+                            ⚠️ {faceWarning}
+                        </div>
+                    )}
+                    {nsfwWarning && (
+                        <div className="absolute top-32 left-1/2 transform -translate-x-1/2 bg-red-600/90 text-white px-6 py-3 rounded-lg shadow-lg z-50 text-base font-bold animate-pulse">
+                            ⛔ {nsfwWarning}
+                        </div>
+                    )}
 
                     {/* Error Toast */}
                     {mediaError && (

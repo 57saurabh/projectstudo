@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 
 export interface Participant {
-    id: string;
+    id: string; // Socket ID
+    userId?: string; // DB User ID (ObjectId)
     displayName: string;
     isMuted: boolean;
     isVideoOff: boolean;
@@ -76,7 +77,7 @@ interface CallState {
     updateParticipant: (userId: string, updates: Partial<Participant>) => void;
 
     addMessage: (message: ChatMessage) => void;
-    resetCall: () => void;
+    resetCall: (keepLocalStream?: boolean) => void;
 }
 
 export const useCallStore = create<CallState>((set) => ({
@@ -163,8 +164,8 @@ export const useCallStore = create<CallState>((set) => ({
         messages: [...state.messages, message]
     })),
 
-    resetCall: () => set({
-        localStream: null,
+    resetCall: (keepLocalStream = false) => set((state) => ({
+        localStream: keepLocalStream ? state.localStream : null,
         mediaError: null,
         remoteStreams: {},
         roomId: null,
@@ -179,5 +180,5 @@ export const useCallStore = create<CallState>((set) => ({
         isVideoOff: false,
         isScreenSharing: false,
         pendingInvite: null
-    })
+    }))
 }));

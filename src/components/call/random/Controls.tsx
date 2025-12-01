@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Mic, MicOff, Video, PhoneOff, SkipForward, UserPlus, Send, Monitor } from 'lucide-react';
+import { Mic, MicOff, PhoneOff, SkipForward, UserPlus, Send, Monitor, MessageSquare } from 'lucide-react';
 
 interface ControlsProps {
     isMuted: boolean;
@@ -37,14 +37,7 @@ export default function Controls({
                     {isMuted ? <MicOff size={24} /> : <Mic size={24} />}
                 </button>
 
-                {/* Camera Toggle - Disabled (Always On) */}
-                <button
-                    disabled
-                    className="p-3 rounded-lg text-white/40 cursor-not-allowed"
-                    title="Camera is always on"
-                >
-                    <Video size={24} />
-                </button>
+
 
                 {/* Screen Share */}
                 <button
@@ -62,7 +55,14 @@ export default function Controls({
                 <button
                     onClick={onInvite}
                     className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                    title="Add User"
+                    title="Invite by Username/ID"
+                >
+                    <Send size={24} />
+                </button>
+                <button
+                    onClick={onAddRandomUser}
+                    className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+                    title="Add Random User"
                 >
                     <UserPlus size={24} />
                 </button>
@@ -87,14 +87,7 @@ export default function Controls({
                     </button>
                 )}
 
-                {/* Multi-user Add Button */}
-                <button
-                    onClick={onAddRandomUser}
-                    className="p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                    title="Add Random User"
-                >
-                    <UserPlus size={24} />
-                </button>
+
 
                 {/* Chat Toggle */}
                 <button
@@ -102,7 +95,7 @@ export default function Controls({
                     className={`p-3 rounded-lg transition-colors ${showChat ? 'bg-white/20 text-white' : 'text-white/80 hover:bg-white/10'}`}
                     title="Toggle Chat"
                 >
-                    <Send size={24} className={showChat ? "" : "opacity-50"} />
+                    <MessageSquare size={24} className={showChat ? "" : "opacity-50"} />
                 </button>
             </div>
         </div>

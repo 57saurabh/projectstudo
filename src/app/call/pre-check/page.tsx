@@ -10,6 +10,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import WebcamCapture from '@/components/profile/WebcamCapture';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
+import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
 
 export default function PreCheckPage() {
     const router = useRouter();
@@ -71,77 +72,49 @@ export default function PreCheckPage() {
         }
     }, [localStream]);
 
+    // ... (inside component)
+
+    useEffect(() => {
+        const loadModel = async () => {
+            try {
+                await faceDetectionService.load();
+                console.log('Face Detection Model loaded');
+            } catch (err) {
+                console.error('Failed to load Face Detection Model:', err);
+            }
+        };
+        loadModel();
+    }, []);
+
     useEffect(() => {
         let mounted = true;
-        let timeoutId: NodeJS.Timeout;
+        let animationFrameId: number;
 
-        const scanFace = async () => {
-            if (!localStream || !mounted || scanningRef.current || !token) return;
+        const scanFace = () => {
+            if (!localStream || !mounted || !videoRef.current) return;
 
-            try {
-                scanningRef.current = true;
+            const videoEl = videoRef.current;
 
-                // Ensure stream is still active
-                if (!localStream.active) return;
+            if (videoEl.readyState >= 2) {
+                const now = Date.now();
+                const result = faceDetectionService.detect(videoEl, now);
 
-                const videoEl = videoRef.current;
-                const canvasEl = canvasRef.current;
-
-                if (!videoEl || !canvasEl) return;
-
-                // Check if video is ready
-                if (videoEl.readyState >= 2) { // HAVE_CURRENT_DATA or better
-                    // Set canvas dimensions to match video
-                    if (canvasEl.width !== videoEl.videoWidth || canvasEl.height !== videoEl.videoHeight) {
-                        canvasEl.width = videoEl.videoWidth;
-                        canvasEl.height = videoEl.videoHeight;
-                    }
-
-                    const ctx = canvasEl.getContext('2d');
-                    if (ctx) {
-                        ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
-
-                        // Convert to blob
-                        const blob = await new Promise<Blob | null>(resolve => canvasEl.toBlob(resolve, 'image/jpeg', 0.8));
-
-                        if (blob) {
-                            // console.log('Sending face scan blob, size:', blob.size); 
-
-                            const formData = new FormData();
-                            formData.append('file', blob, 'capture.jpg');
-
-                            const response = await axios.post('/api/proxy/face', formData, {
-                                headers: { 'Content-Type': 'multipart/form-data' },
-                                timeout: 5000 // 5s timeout
-                            });
-
-                            // console.log('Face detection response:', response.data);
-
-                            if (mounted) {
-                                const detected = response.data.faceDetected;
-                                setFaceDetected(detected);
-                                setCheckStatus(detected ? 'success' : 'failed');
-                                setStatusMessage(detected ? 'Face detected! You are ready.' : 'No face detected. Stay in frame.');
-                            }
-                        } else {
-                            console.warn('Failed to create blob from canvas');
-                        }
-                    }
+                if (result && result.faceLandmarks.length > 0) {
+                    setFaceDetected(true);
+                    setCheckStatus('success');
+                    setStatusMessage('Face detected! You are ready.');
                 } else {
-                    // console.log('Video not ready, state:', videoEl.readyState);
-                    // Try to play if paused
-                    if (videoEl.paused) {
-                        videoEl.play().catch(e => console.error('Auto-play failed:', e));
-                    }
+                    setFaceDetected(false);
+                    setCheckStatus('failed');
+                    setStatusMessage('No face detected. Stay in frame.');
                 }
-            } catch (error) {
-                console.error('Face scan error:', error);
-            } finally {
-                scanningRef.current = false;
-                if (mounted) {
-                    timeoutId = setTimeout(scanFace, 1000); // Scan every 1 second
+            } else {
+                if (videoEl.paused) {
+                    videoEl.play().catch(e => console.error('Auto-play failed:', e));
                 }
             }
+
+            animationFrameId = requestAnimationFrame(scanFace);
         };
 
         if (localStream) {
@@ -150,7 +123,7 @@ export default function PreCheckPage() {
 
         return () => {
             mounted = false;
-            clearTimeout(timeoutId);
+            cancelAnimationFrame(animationFrameId);
         };
     }, [localStream]);
 

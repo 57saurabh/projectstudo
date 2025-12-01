@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} bg-background text-white min-h-screen overflow-hidden`}>
+      <body className={`${inter.variable} bg-background text-white min-h-screen overflow-hidden`} suppressHydrationWarning>
         <ReduxProvider>
           <ThemeProvider>
             <AuthInitializer />

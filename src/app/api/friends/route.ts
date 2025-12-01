@@ -65,6 +65,18 @@ export async function POST(req: Request) {
         });
 
         if (existingRequest) {
+            // If the existing request was sent BY the other person TO us, accept it!
+            if (existingRequest.sender.toString() === receiverId && existingRequest.receiver.toString() === userId) {
+                existingRequest.status = 'accepted';
+                await existingRequest.save();
+
+                // Add to friends lists
+                await User.findByIdAndUpdate(userId, { $addToSet: { friends: receiverId } });
+                await User.findByIdAndUpdate(receiverId, { $addToSet: { friends: userId } });
+
+                return NextResponse.json({ message: 'Friend request accepted', friendRequest: existingRequest }, { status: 200 });
+            }
+
             return NextResponse.json({ message: 'Request already pending' }, { status: 400 });
         }
 

@@ -306,14 +306,14 @@ export const useWebRTC = () => {
         Object.values(peerConnections.current).forEach(pc => pc.close());
         peerConnections.current = {};
 
-        // Stop local stream tracks
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop());
-            streamRef.current = null;
-        }
+        // Stop local stream tracks - REMOVED to keep camera on
+        // if (streamRef.current) {
+        //     streamRef.current.getTracks().forEach(track => track.stop());
+        //     streamRef.current = null;
+        // }
 
-        // Reset global store state
-        useCallStore.getState().resetCall();
+        // Reset global store state, but KEEP local stream
+        useCallStore.getState().resetCall(true);
 
         // Disconnect socket if needed (useSignaling handles this on unmount, but we can force emit leave)
         // socket?.emit('leave-room'); // Optional if backend handles disconnect well

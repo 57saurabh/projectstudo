@@ -41,7 +41,7 @@ export const useSignaling = () => {
         });
 
         // Matchmaking Events
-        socket.on('match-proposed', ({ peerId, initiator, reputation, avatarUrl, username, bio, country, language }) => {
+        socket.on('match-proposed', ({ peerId, peerUserId, initiator, reputation, avatarUrl, username, bio, country, language }) => {
             console.log('Match proposed:', peerId);
             setCallState('proposed');
             setInQueue(false);
@@ -49,6 +49,7 @@ export const useSignaling = () => {
             // Add participant as placeholder (waiting for accept)
             addParticipant({
                 id: peerId,
+                userId: peerUserId,
                 displayName: username || 'Stranger', // Show username initially
                 isMuted: false,
                 isVideoOff: false,
@@ -71,7 +72,7 @@ export const useSignaling = () => {
 
         socket.on('match-cancelled', () => {
             console.log('Match cancelled by peer');
-            resetCall();
+            resetCall(true); // Keep camera on
             // Auto-search again?
             findMatch();
         });
@@ -144,7 +145,7 @@ export const useSignaling = () => {
 
         socket.on('force-disconnect', () => {
             console.log('Received force-disconnect. Resetting call and searching...');
-            resetCall();
+            resetCall(true); // Keep camera on
             setTimeout(() => {
                 findMatch();
             }, 1000);

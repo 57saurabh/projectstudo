@@ -117,6 +117,7 @@ export class SocketGateway {
                     // Notify both users with profile info (PROPOSED)
                     this.io.to(socket.id).emit('match-proposed', {
                         peerId: match,
+                        peerUserId: matchUserId, // Send real User ID
                         initiator: true,
                         reputation: this.userReputations.get(match) || 100,
                         avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${match}`,
@@ -127,6 +128,7 @@ export class SocketGateway {
                     });
                     this.io.to(match).emit('match-proposed', {
                         peerId: socket.id,
+                        peerUserId: currentUserId, // Send real User ID
                         initiator: false,
                         reputation: this.userReputations.get(socket.id) || 100,
                         avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${socket.id}`,
