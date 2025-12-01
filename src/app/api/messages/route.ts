@@ -90,7 +90,16 @@ export async function GET(req: NextRequest) {
             }
         ]);
 
-        return NextResponse.json(conversations);
+        // Fetch current user to get friends list
+        const currentUser = await User.findById(userId).select('friends');
+        const friendIds = currentUser?.friends.map((id: any) => id.toString()) || [];
+
+        const conversationsWithFriendStatus = conversations.map((conv: any) => ({
+            ...conv,
+            isFriend: friendIds.includes(conv._id)
+        }));
+
+        return NextResponse.json(conversationsWithFriendStatus);
 
     } catch (error) {
         console.error('Error fetching conversations:', error);

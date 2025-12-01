@@ -5,6 +5,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import { SocketGateway } from './signaling/socket.gateway';
+import { FriendService } from './friends/friends.service';
+import { FriendController } from './friends/friends.controller';
 
 dotenv.config();
 
@@ -35,6 +37,11 @@ async function startServer() {
 
         // Initialize WebSocket Gateway
         new SocketGateway(io);
+
+        // Initialize Friend Module
+        const friendService = new FriendService(io);
+        const friendController = new FriendController(friendService);
+        app.use('/friend-request', friendController.router);
 
         server.listen(PORT, () => {
             console.log(`🚀 Backend Server running on port ${PORT}`);

@@ -25,7 +25,8 @@ function decryptMessage(encryptedText: string): string {
     }
 }
 
-export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ userId: string }> }) {
+    const params = await props.params;
     try {
         await dbConnect();
 
@@ -51,7 +52,41 @@ export async function GET(req: NextRequest, { params }: { params: { userId: stri
             text: decryptMessage(msg.text)
         }));
 
-        return NextResponse.json(decryptedMessages);
+        // Check if friends
+        const { UserModel } = await import('@/models/User');
+        const { FriendRequestModel } = await import('@/models/FriendRequest'); // Dynamic import to avoid circular deps if any
+
+        const currentUser = await UserModel.findById(currentUserId);
+        const canSend = currentUser?.friends.includes(targetUserId) || false;
+
+        let requestStatus = 'none';
+        let requestId = undefined;
+
+        if (!canSend) {
+            const pendingRequest = await FriendRequestModel.findOne({
+                $or: [
+                    { sender: currentUserId, receiver: targetUserId },
+                    { sender: targetUserId, receiver: currentUserId }
+                ],
+                status: 'pending'
+            });
+
+            if (pendingRequest) {
+                if (pendingRequest.sender.toString() === currentUserId) {
+                    requestStatus = 'pending';
+                } else {
+                    requestStatus = 'received';
+                    requestId = pendingRequest._id;
+                }
+            }
+        }
+
+        return NextResponse.json({
+            messages: decryptedMessages,
+            canSend,
+            requestStatus,
+            requestId
+        });
 
     } catch (error) {
         console.error('Error fetching messages:', error);

@@ -72,6 +72,7 @@ export class SocketGateway {
                 for (const [id, socket] of this.io.sockets.sockets) {
                     users.push({
                         id: id,
+                        userId: this.socketToUserId.get(id), // Include real User ID
                         displayName: `User ${id.slice(0, 4)}`, // Mock name
                         reputation: this.userReputations.get(id) || 100
                     });
@@ -307,13 +308,29 @@ export class SocketGateway {
                 // We can check if the room has members if we really want to know:
                 // const isOnline = this.io.sockets.adapter.rooms.get(target)?.size > 0;
 
+                // Check if friends
+                const senderUser = await UserModel.findById(socket.id); // Wait, socket.id is NOT userId. We need mapped userId.
+                const senderUserId = this.socketToUserId.get(socket.id);
+
+                if (!senderUserId) {
+                    socket.emit('error', { message: 'User not authenticated' });
+                    return;
+                }
+
+                const sender = await UserModel.findById(senderUserId);
+                if (!sender || !sender.friends.includes(target)) {
+                    // Not friends!
+                    socket.emit('error', { code: 'NOT_FRIENDS', message: 'Messaging allowed only between friends.' });
+                    return;
+                }
+
                 // Moderate Message
                 const filteredMessage = this.moderationService.filterContent(message);
 
                 // 1. Relay to target (Real-time)
                 const senderName = this.userNames.get(socket.id) || 'Stranger';
                 socket.to(target).emit('chat-message', {
-                    senderId: socket.id,
+                    senderId: senderUserId, // Use real User ID
                     senderName: senderName,
                     text: filteredMessage
                 });

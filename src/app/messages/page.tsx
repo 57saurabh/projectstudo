@@ -39,7 +39,31 @@ export default function MessagesPage() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(true);
+    const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
+
+
+    const [canSend, setCanSend] = useState(true);
+    const [friendRequestStatus, setFriendRequestStatus] = useState<'none' | 'pending' | 'accepted' | 'received'>('none');
+    const [requestId, setRequestId] = useState<string | undefined>(undefined);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    // Track online users
+    useEffect(() => {
+        if (!socket) return;
+
+        const handleOnlineUsers = (users: any[]) => {
+            // Filter out users without userId and map to Set
+            const onlineUserIds = new Set(users.filter(u => u.userId).map(u => u.userId));
+            setOnlineUsers(onlineUserIds);
+        };
+
+        socket.emit('get-online-users');
+        socket.on('online-users-list', handleOnlineUsers);
+
+        return () => {
+            socket.off('online-users-list', handleOnlineUsers);
+        };
+    }, [socket]);
 
     // Fetch Conversations
     useEffect(() => {
@@ -80,7 +104,10 @@ export default function MessagesPage() {
                                 },
                                 unreadCount: 0
                             };
-                            setConversations(prev => [newConv, ...prev]);
+                            setConversations(prev => {
+                                if (prev.some(c => c._id === newConv._id)) return prev;
+                                return [newConv, ...prev];
+                            });
                             setActiveConversation(newConv);
                         } catch (err) {
                             console.error('Failed to fetch user for new chat', err);
@@ -107,7 +134,10 @@ export default function MessagesPage() {
                 const res = await axios.get(`/api/messages/${activeConversation._id}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setMessages(res.data);
+                setMessages(res.data.messages);
+                setCanSend(res.data.canSend);
+                setFriendRequestStatus(res.data.requestStatus);
+                setRequestId(res.data.requestId);
                 scrollToBottom();
 
                 // Mark as read if there are unread messages
@@ -125,11 +155,64 @@ export default function MessagesPage() {
         fetchMessages();
     }, [activeConversation, token, markAsRead]);
 
+    // Handle Friend Request Actions
+    const sendFriendRequest = async () => {
+        if (!activeConversation || !user) return;
+        const backendUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+        try {
+            await axios.post(`${backendUrl}/friend-request/send`, {
+                senderId: user._id,
+                receiverId: activeConversation._id
+            });
+            setFriendRequestStatus('pending');
+            alert('Friend request sent!');
+        } catch (error: any) {
+            console.error('Failed to send friend request', error);
+            const msg = error.response?.data?.message || 'Failed to send friend request';
+            alert(msg);
+            if (msg === 'Friend request already pending') {
+                setFriendRequestStatus('pending');
+            }
+        }
+    };
+
+    const acceptFriendRequest = async () => {
+        if (!requestId || !user) return;
+        const backendUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+        try {
+            await axios.post(`${backendUrl}/friend-request/accept`, {
+                requestId: requestId,
+                userId: user._id
+            });
+            setFriendRequestStatus('accepted');
+            setCanSend(true);
+            alert('Friend request accepted!');
+        } catch (error: any) {
+            console.error('Failed to accept friend request', error);
+            alert(error.response?.data?.message || 'Failed to accept request');
+        }
+    };
+
+    // Listen for friendship approval
+    useEffect(() => {
+        if (!socket) return;
+        const handleFriendshipApproved = (data: { friendId: string }) => {
+            if (activeConversation && data.friendId === activeConversation._id) {
+                setCanSend(true);
+                setFriendRequestStatus('accepted');
+            }
+        };
+        socket.on('friendship_approved', handleFriendshipApproved);
+        return () => {
+            socket.off('friendship_approved', handleFriendshipApproved);
+        };
+    }, [socket, activeConversation]);
+
     // Handle Real-time Messages
     useEffect(() => {
         if (!socket) return;
 
-        const handleNewMessage = (data: { senderId: string; text: string; senderName: string }) => {
+        const handleNewMessage = async (data: { senderId: string; text: string; senderName: string }) => {
             // If message is from the active conversation user
             if (activeConversation && data.senderId === activeConversation._id) {
                 setMessages(prev => [...prev, {
@@ -148,10 +231,6 @@ export default function MessagesPage() {
                 if (existing) {
                     const isChatOpen = activeConversation?._id === data.senderId;
 
-                    // If chat is open, we mark as read immediately (or let the effect handle it? Effect only runs on change)
-                    // Better: If chat is open, unreadCount stays 0. If closed, increment.
-                    // Actually, if chat is open, we should probably call markAsRead again? 
-                    // For simplicity, if chat is open, we assume it's read.
                     if (isChatOpen) {
                         markAsRead(data.senderId);
                     }
@@ -165,10 +244,39 @@ export default function MessagesPage() {
                         ...prev.filter(c => c._id !== data.senderId)
                     ];
                 }
-                // If new conversation, we should fetch it.
-                // For now, return prev.
                 return prev;
             });
+
+            // If conversation doesn't exist, fetch user and add it
+            const conversationExists = conversations.some(c => c._id === data.senderId);
+            if (!conversationExists) {
+                try {
+                    const userRes = await axios.get(`/api/users/${data.senderId}`, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    const newUser = userRes.data;
+                    const newConv: Conversation = {
+                        _id: newUser._id,
+                        user: {
+                            displayName: newUser.displayName,
+                            username: newUser.username,
+                            avatarUrl: newUser.avatarUrl
+                        },
+                        lastMessage: {
+                            text: data.text,
+                            timestamp: new Date().toISOString(),
+                            senderId: data.senderId
+                        },
+                        unreadCount: 1
+                    };
+                    setConversations(prev => {
+                        if (prev.some(c => c._id === newConv._id)) return prev;
+                        return [newConv, ...prev];
+                    });
+                } catch (err) {
+                    console.error('Failed to fetch user for new message', err);
+                }
+            }
         };
 
         socket.on('chat-message', handleNewMessage);
@@ -262,7 +370,10 @@ export default function MessagesPage() {
                 },
                 unreadCount: 0
             };
-            setConversations(prev => [newConv, ...prev]);
+            setConversations(prev => {
+                if (prev.some(c => c._id === newConv._id)) return prev;
+                return [newConv, ...prev];
+            });
             setActiveConversation(newConv);
         }
         setShowNewChatModal(false);
@@ -388,8 +499,9 @@ export default function MessagesPage() {
                             />
                             <div>
                                 <h3 className="font-bold">{activeConversation.user.displayName}</h3>
-                                <p className="text-xs text-green-500 flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-full bg-green-500"></span> Online
+                                <p className={`text-xs flex items-center gap-1 ${onlineUsers.has(activeConversation._id) ? 'text-green-500' : 'text-gray-400'}`}>
+                                    <span className={`w-2 h-2 rounded-full ${onlineUsers.has(activeConversation._id) ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                                    {onlineUsers.has(activeConversation._id) ? 'Online' : 'Offline'}
                                 </p>
                             </div>
                         </div>
@@ -412,25 +524,50 @@ export default function MessagesPage() {
                             <div ref={messagesEndRef} />
                         </div>
 
-                        {/* Input */}
-                        <form onSubmit={handleSendMessage} className="p-4 border-t border-glass-border bg-surface">
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={inputText}
-                                    onChange={(e) => setInputText(e.target.value)}
-                                    placeholder="Type a message..."
-                                    className="flex-1 bg-glass-bg border border-glass-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
-                                />
-                                <button
-                                    type="submit"
-                                    disabled={!inputText.trim()}
-                                    className="p-3 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    <Send size={20} />
-                                </button>
+                        {/* Input or Friend Request */}
+                        {canSend ? (
+                            <form onSubmit={handleSendMessage} className="p-4 border-t border-glass-border bg-surface">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={inputText}
+                                        onChange={(e) => setInputText(e.target.value)}
+                                        placeholder="Type a message..."
+                                        className="flex-1 bg-glass-bg border border-glass-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={!inputText.trim()}
+                                        className="p-3 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                    >
+                                        <Send size={20} />
+                                    </button>
+                                </div>
+                            </form>
+                        ) : (
+                            <div className="p-4 border-t border-glass-border bg-surface flex flex-col items-center justify-center gap-2">
+                                <p className="text-sm text-text-secondary">You can only chat with friends.</p>
+                                {friendRequestStatus === 'pending' ? (
+                                    <button disabled className="px-4 py-2 bg-gray-500 text-white rounded-xl text-sm font-medium cursor-not-allowed">
+                                        Request Sent
+                                    </button>
+                                ) : friendRequestStatus === 'received' ? (
+                                    <button
+                                        onClick={acceptFriendRequest}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors"
+                                    >
+                                        Accept Friend Request
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={sendFriendRequest}
+                                        className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+                                    >
+                                        Send Friend Request
+                                    </button>
+                                )}
                             </div>
-                        </form>
+                        )}
                     </div>
                 ) : (
                     <div className="hidden md:flex flex-1 items-center justify-center flex-col text-text-secondary">
