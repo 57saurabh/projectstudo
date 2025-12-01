@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
         }
 
         const decoded: any = jwt.verify(token, JWT_SECRET);
-        const userId = decoded.userId;
+        const userId = decoded.id;
 
         const { ConversationModel } = await import("@/models/Conversation");
 
@@ -40,11 +40,16 @@ export async function GET(req: NextRequest) {
                 return {
                     _id: otherUser._id,
                     conversationId: conv._id,
-                    displayName: otherUser.displayName,
-                    username: otherUser.username,
-                    avatarUrl: otherUser.avatarUrl,
-                    lastMessage: conv.lastMessage?.text || null,
-                    lastMessageTimestamp: conv.lastMessage?.timestamp || null,
+                    user: {
+                        displayName: otherUser.displayName,
+                        username: otherUser.username,
+                        avatarUrl: otherUser.avatarUrl,
+                    },
+                    lastMessage: conv.lastMessage ? {
+                        text: conv.lastMessage.text,
+                        timestamp: conv.lastMessage.timestamp,
+                        senderId: conv.lastMessage.senderId
+                    } : null,
                     unreadCount: conv.unreadCount?.get(userId) || 0,
                     isFriend: false,
                 };

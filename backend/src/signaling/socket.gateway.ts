@@ -42,6 +42,7 @@ export class SocketGateway {
                 this.socketToUserId.set(socket.id, userId);
                 this.userIdToSocket.set(userId, socket.id);
                 socket.join(userId);
+                console.log(`User ${userId} joined room ${userId}`);
             }
 
             if (!this.userReputations.has(socket.id)) {
@@ -227,8 +228,12 @@ export class SocketGateway {
                         await conversation.save();
                     }
 
+                    const senderName = sender.username || sender.displayName || `anonymous${Math.floor(Math.random() * 1000)}.n0n`;
+
+                    console.log(`Emitting chat-message to target ${target} from ${senderUserId}`);
                     this.io.to(target).emit('chat-message', {
                         senderId: senderUserId,
+                        senderName: senderName,
                         text: filteredMessage,
                         timestamp: newMessage.timestamp.toISOString(),
                         conversationId: conversation._id

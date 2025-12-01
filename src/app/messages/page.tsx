@@ -1,34 +1,39 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { MessageSquare, Search, Send, ArrowLeft } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { MessageSquare, Search, Send, ArrowLeft, Clock, Check, CheckCheck } from 'lucide-react';
 import { useSelector } from 'react-redux';
-import { RootState } from '@/lib/store/store';
+import { RootState } from '@/store/store';
 import axios from 'axios';
 import { useSignaling } from '@/lib/webrtc/useSignaling';
 
-interface Conversation {
-    _id: string; // User ID of the other person
-    user: {
-        displayName: string;
-        username: string;
-        avatarUrl?: string;
-    };
-    lastMessage: {
-        text: string;
-        timestamp: string;
-        senderId: string;
-    };
-    unreadCount: number;
-}
+type ConversationUser = {
+    displayName: string;
+    username: string;
+    avatarUrl?: string;
+};
 
-interface Message {
+type ConversationLastMessage = {
+    text: string;
+    timestamp: string;
+    senderId: string;
+};
+
+type Conversation = {
+    _id: string; // other user's id
+    user: ConversationUser;
+    lastMessage: ConversationLastMessage;
+    unreadCount: number;
+};
+
+type Message = {
     _id: string;
     senderId: string;
     receiverId: string;
     text: string;
     timestamp: string;
-}
+    status?: 'pending' | 'sent' | 'read';
+};
 
 export default function MessagesPage() {
     const { user, token } = useSelector((state: RootState) => state.auth);
@@ -41,19 +46,24 @@ export default function MessagesPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
 
-
     const [canSend, setCanSend] = useState(true);
     const [friendRequestStatus, setFriendRequestStatus] = useState<'none' | 'pending' | 'accepted' | 'received'>('none');
     const [requestId, setRequestId] = useState<string | undefined>(undefined);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const [showNewChatModal, setShowNewChatModal] = useState(false);
+    const [friends, setFriends] = useState<any[]>([]);
 
     // Track online users
     useEffect(() => {
         if (!socket) return;
 
         const handleOnlineUsers = (users: any[]) => {
-            // Filter out users without userId and map to Set
-            const onlineUserIds = new Set(users.filter(u => u.userId).map(u => u.userId));
+            const onlineUserIds = new Set(
+                users
+                    .filter((u) => u.userId)
+                    .map((u) => u.userId as string)
+            );
             setOnlineUsers(onlineUserIds);
         };
 
@@ -73,22 +83,29 @@ export default function MessagesPage() {
                 const res = await axios.get('/api/messages', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                setConversations(res.data);
 
-                // Check for userId query param to auto-open chat
+                // Expect backend to already return in Conversation shape,
+                // if not, you can map here.
+                setConversations(res.data);
+                console.log('Fetched conversations:', res.data);
+
+                // Auto-open chat if ?userId=... in URL
                 const urlParams = new URLSearchParams(window.location.search);
                 const targetUserId = urlParams.get('userId');
+
                 if (targetUserId) {
-                    // Find existing conversation
-                    const existing = res.data.find((c: Conversation) => c._id === targetUserId);
+                    const existing: Conversation | undefined = res.data.find(
+                        (c: Conversation) => c._id === targetUserId
+                    );
+
                     if (existing) {
                         setActiveConversation(existing);
                     } else {
-                        // If not found in existing, fetch user details and create temp conversation
                         try {
                             const userRes = await axios.get(`/api/users/${targetUserId}`, {
                                 headers: { Authorization: `Bearer ${token}` }
                             });
+
                             const newUser = userRes.data;
                             const newConv: Conversation = {
                                 _id: newUser._id,
@@ -104,8 +121,9 @@ export default function MessagesPage() {
                                 },
                                 unreadCount: 0
                             };
-                            setConversations(prev => {
-                                if (prev.some(c => c._id === newConv._id)) return prev;
+
+                            setConversations((prev) => {
+                                if (prev.some((c) => c._id === newConv._id)) return prev;
                                 return [newConv, ...prev];
                             });
                             setActiveConversation(newConv);
@@ -113,16 +131,17 @@ export default function MessagesPage() {
                             console.error('Failed to fetch user for new chat', err);
                         }
                     }
+
                     // Clean URL
                     window.history.replaceState({}, '', '/messages');
                 }
-
             } catch (error) {
                 console.error('Failed to fetch conversations', error);
             } finally {
                 setIsLoading(false);
             }
         };
+
         fetchConversations();
     }, [token]);
 
@@ -134,6 +153,7 @@ export default function MessagesPage() {
                 const res = await axios.get(`/api/messages/${activeConversation._id}`, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
+
                 setMessages(res.data.messages);
                 setCanSend(res.data.canSend);
                 setFriendRequestStatus(res.data.requestStatus);
@@ -143,22 +163,29 @@ export default function MessagesPage() {
                 // Mark as read if there are unread messages
                 if (activeConversation.unreadCount > 0) {
                     markAsRead(activeConversation._id);
-                    // Update local state to clear badge
-                    setConversations(prev => prev.map(c =>
-                        c._id === activeConversation._id ? { ...c, unreadCount: 0 } : c
-                    ));
+
+                    setConversations((prev) =>
+                        prev.map((c) =>
+                            c._id === activeConversation._id
+                                ? { ...c, unreadCount: 0 }
+                                : c
+                        )
+                    );
                 }
             } catch (error) {
                 console.error('Failed to fetch messages', error);
             }
         };
+
         fetchMessages();
     }, [activeConversation, token, markAsRead]);
 
     // Handle Friend Request Actions
+    const backendUrl =
+        process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
+
     const sendFriendRequest = async () => {
         if (!activeConversation || !user) return;
-        const backendUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
         try {
             await axios.post(`${backendUrl}/friend-request/send`, {
                 senderId: user._id,
@@ -168,7 +195,9 @@ export default function MessagesPage() {
             alert('Friend request sent!');
         } catch (error: any) {
             console.error('Failed to send friend request', error);
-            const msg = error.response?.data?.message || 'Failed to send friend request';
+            const msg =
+                error.response?.data?.message ||
+                'Failed to send friend request';
             alert(msg);
             if (msg === 'Friend request already pending') {
                 setFriendRequestStatus('pending');
@@ -178,7 +207,6 @@ export default function MessagesPage() {
 
     const acceptFriendRequest = async () => {
         if (!requestId || !user) return;
-        const backendUrl = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
         try {
             await axios.post(`${backendUrl}/friend-request/accept`, {
                 requestId: requestId,
@@ -193,67 +221,106 @@ export default function MessagesPage() {
         }
     };
 
-    // Listen for friendship approval
+    // Listen for friendship approval (real-time via WebRTC signaling socket)
     useEffect(() => {
         if (!socket) return;
+
         const handleFriendshipApproved = (data: { friendId: string }) => {
             if (activeConversation && data.friendId === activeConversation._id) {
                 setCanSend(true);
                 setFriendRequestStatus('accepted');
             }
         };
+
         socket.on('friendship_approved', handleFriendshipApproved);
+
         return () => {
             socket.off('friendship_approved', handleFriendshipApproved);
         };
     }, [socket, activeConversation]);
 
-    // Handle Real-time Messages
-    useEffect(() => {
-        if (!socket) return;
+    const playNotificationSound = () => {
+        const audio = new Audio('/notification.mp3');
+        audio.play().catch(err => console.error('Error playing sound:', err));
+    };
 
-        const handleNewMessage = async (data: { senderId: string; text: string; senderName: string }) => {
-            // If message is from the active conversation user
+    // Handle Real-time Messages over the same signaling socket (chat + WebRTC)
+    useEffect(() => {
+        if (!socket || !user) return;
+
+        const handleNewMessage = async (data: {
+            senderId: string;
+            text: string;
+            senderName: string;
+            timestamp?: string;
+        }) => {
+            console.log(`Received chat-message from ${data.senderName}:`, data);
+            const msgTimestamp = data.timestamp || new Date().toISOString();
+
+            // If message is from the active conversation user -> push into opened thread
             if (activeConversation && data.senderId === activeConversation._id) {
-                setMessages(prev => [...prev, {
-                    _id: Date.now().toString(), // Temp ID
-                    senderId: data.senderId,
-                    receiverId: user?._id || '',
-                    text: data.text,
-                    timestamp: new Date().toISOString()
-                }]);
+                setMessages((prev) => [
+                    ...prev,
+                    {
+                        _id: Date.now().toString(),
+                        senderId: data.senderId,
+                        receiverId: user._id,
+                        text: data.text,
+                        timestamp: msgTimestamp
+                    }
+                ]);
                 scrollToBottom();
+            } else {
+                playNotificationSound();
             }
 
-            // Update conversations list (Last Message & Unread Count)
-            setConversations(prev => {
-                const existing = prev.find(c => c._id === data.senderId);
+            // Update conversation list (last message & unread)
+            let conversationExists = false;
+
+            setConversations((prev) => {
+                const existing = prev.find((c) => c._id === data.senderId);
+
+                const isChatOpen =
+                    !!activeConversation &&
+                    activeConversation._id === data.senderId;
+
                 if (existing) {
-                    const isChatOpen = activeConversation?._id === data.senderId;
+                    conversationExists = true;
 
                     if (isChatOpen) {
+                        // Mark as read in backend via same signaling channel
                         markAsRead(data.senderId);
                     }
 
-                    return [
-                        {
-                            ...existing,
-                            lastMessage: { text: data.text, timestamp: new Date().toISOString(), senderId: data.senderId },
-                            unreadCount: isChatOpen ? 0 : (existing.unreadCount || 0) + 1
+                    const updated: Conversation = {
+                        ...existing,
+                        lastMessage: {
+                            text: data.text,
+                            timestamp: msgTimestamp,
+                            senderId: data.senderId
                         },
-                        ...prev.filter(c => c._id !== data.senderId)
+                        unreadCount: isChatOpen
+                            ? 0
+                            : (existing.unreadCount || 0) + 1
+                    };
+
+                    // Move updated conversation to top
+                    return [
+                        updated,
+                        ...prev.filter((c) => c._id !== data.senderId)
                     ];
                 }
+
                 return prev;
             });
 
-            // If conversation doesn't exist, fetch user and add it
-            const conversationExists = conversations.some(c => c._id === data.senderId);
-            if (!conversationExists) {
+            // If conversation doesn't exist yet, fetch other user and create it
+            if (!conversationExists && token) {
                 try {
                     const userRes = await axios.get(`/api/users/${data.senderId}`, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
+
                     const newUser = userRes.data;
                     const newConv: Conversation = {
                         _id: newUser._id,
@@ -264,13 +331,14 @@ export default function MessagesPage() {
                         },
                         lastMessage: {
                             text: data.text,
-                            timestamp: new Date().toISOString(),
+                            timestamp: msgTimestamp,
                             senderId: data.senderId
                         },
                         unreadCount: 1
                     };
-                    setConversations(prev => {
-                        if (prev.some(c => c._id === newConv._id)) return prev;
+
+                    setConversations((prev) => {
+                        if (prev.some((c) => c._id === newConv._id)) return prev;
                         return [newConv, ...prev];
                     });
                 } catch (err) {
@@ -281,10 +349,33 @@ export default function MessagesPage() {
 
         socket.on('chat-message', handleNewMessage);
 
+        const handleMessageSent = (data: { conversationId: string, text: string, timestamp: string, receiverId: string }) => {
+            if (activeConversation && activeConversation._id === data.receiverId) {
+                setMessages(prev => prev.map(msg =>
+                    msg.text === data.text && msg.status === 'pending'
+                        ? { ...msg, status: 'sent', timestamp: data.timestamp }
+                        : msg
+                ));
+            }
+        };
+
+        const handleMessagesRead = (data: { readerId: string, conversationId: string }) => {
+            if (activeConversation && activeConversation._id === data.readerId) {
+                setMessages(prev => prev.map(msg =>
+                    msg.senderId === user._id ? { ...msg, status: 'read' } : msg
+                ));
+            }
+        };
+
+        socket.on('message-sent', handleMessageSent);
+        socket.on('messages-read', handleMessagesRead);
+
         return () => {
             socket.off('chat-message', handleNewMessage);
+            socket.off('message-sent', handleMessageSent);
+            socket.off('messages-read', handleMessagesRead);
         };
-    }, [socket, activeConversation, user]);
+    }, [socket, activeConversation, user, token, markAsRead]);
 
     const scrollToBottom = () => {
         setTimeout(() => {
@@ -296,40 +387,49 @@ export default function MessagesPage() {
         e?.preventDefault();
         if (!inputText.trim() || !activeConversation || !user) return;
 
+        const now = new Date().toISOString();
+
         // Optimistic Update
         const tempMsg: Message = {
             _id: Date.now().toString(),
             senderId: user._id,
             receiverId: activeConversation._id,
             text: inputText,
-            timestamp: new Date().toISOString()
+            timestamp: now,
+            status: 'pending'
         };
-        setMessages(prev => [...prev, tempMsg]);
+
+        setMessages((prev) => [...prev, tempMsg]);
         scrollToBottom();
 
-        // Send via Socket
+        // Send via common WebRTC signaling socket
         sendMessage(activeConversation._id, inputText);
 
-        // Update Conversation List
-        setConversations(prev => {
-            const existing = prev.find(c => c._id === activeConversation._id);
+        // Update Conversation List (last message + bump to top)
+        setConversations((prev) => {
+            const existing = prev.find((c) => c._id === activeConversation._id);
+
             if (existing) {
+                const updated: Conversation = {
+                    ...existing,
+                    lastMessage: {
+                        text: inputText,
+                        timestamp: now,
+                        senderId: user._id
+                    }
+                };
+
                 return [
-                    { ...existing, lastMessage: { text: inputText, timestamp: new Date().toISOString(), senderId: user._id } },
-                    ...prev.filter(c => c._id !== activeConversation._id)
+                    updated,
+                    ...prev.filter((c) => c._id !== activeConversation._id)
                 ];
             }
+
             return prev;
         });
 
         setInputText('');
     };
-
-    // Helper to decrypt if needed (frontend usually receives decrypted from API, but socket might be raw? 
-    // Wait, socket sends raw text in 'chat-message' event from backend, so no decryption needed here)
-
-    const [showNewChatModal, setShowNewChatModal] = useState(false);
-    const [friends, setFriends] = useState<any[]>([]);
 
     // Fetch Friends for New Chat
     const fetchFriends = async () => {
@@ -350,12 +450,11 @@ export default function MessagesPage() {
     };
 
     const selectFriendForChat = (friend: any) => {
-        // Check if conversation already exists
-        const existing = conversations.find(c => c._id === friend._id);
+        const existing = conversations.find((c) => c._id === friend._id);
+
         if (existing) {
             setActiveConversation(existing);
         } else {
-            // Create temporary conversation object
             const newConv: Conversation = {
                 _id: friend._id,
                 user: {
@@ -370,12 +469,15 @@ export default function MessagesPage() {
                 },
                 unreadCount: 0
             };
-            setConversations(prev => {
-                if (prev.some(c => c._id === newConv._id)) return prev;
+
+            setConversations((prev) => {
+                if (prev.some((c) => c._id === newConv._id)) return prev;
                 return [newConv, ...prev];
             });
+
             setActiveConversation(newConv);
         }
+
         setShowNewChatModal(false);
     };
 
@@ -392,35 +494,46 @@ export default function MessagesPage() {
             </div>
 
             <div className="flex flex-1 gap-6 overflow-hidden bg-surface border border-glass-border rounded-2xl shadow-xl relative">
-
                 {/* New Chat Modal */}
                 {showNewChatModal && (
                     <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                         <div className="bg-surface border border-glass-border rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl">
                             <div className="p-4 border-b border-glass-border flex justify-between items-center">
                                 <h3 className="font-bold text-lg">Start New Chat</h3>
-                                <button onClick={() => setShowNewChatModal(false)} className="p-1 hover:bg-glass-bg rounded-full">
+                                <button
+                                    onClick={() => setShowNewChatModal(false)}
+                                    className="p-1 hover:bg-glass-bg rounded-full"
+                                >
                                     <ArrowLeft size={20} />
                                 </button>
                             </div>
                             <div className="flex-1 overflow-y-auto p-2">
                                 {friends.length === 0 ? (
-                                    <div className="text-center p-8 text-text-secondary">No friends found. Add friends first!</div>
+                                    <div className="text-center p-8 text-text-secondary">
+                                        No friends found. Add friends first!
+                                    </div>
                                 ) : (
-                                    friends.map(friend => (
+                                    friends.map((friend) => (
                                         <button
                                             key={friend._id}
                                             onClick={() => selectFriendForChat(friend)}
                                             className="w-full flex items-center gap-3 p-3 hover:bg-glass-bg rounded-xl transition-colors text-left"
                                         >
                                             <img
-                                                src={friend.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend._id}`}
+                                                src={
+                                                    friend.avatarUrl ||
+                                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend._id}`
+                                                }
                                                 alt={friend.displayName}
                                                 className="w-10 h-10 rounded-full bg-gray-700 object-cover"
                                             />
                                             <div>
-                                                <p className="font-medium">{friend.displayName}</p>
-                                                <p className="text-xs text-text-secondary">@{friend.username}</p>
+                                                <p className="font-medium">
+                                                    {friend.displayName}
+                                                </p>
+                                                <p className="text-xs text-text-secondary">
+                                                    @{friend.username}
+                                                </p>
                                             </div>
                                         </button>
                                     ))
@@ -431,10 +544,16 @@ export default function MessagesPage() {
                 )}
 
                 {/* Chat List */}
-                <div className={`${activeConversation ? 'hidden md:flex' : 'flex'} w-full md:w-80 lg:w-96 flex-col border-r border-glass-border bg-surface/50`}>
+                <div
+                    className={`${activeConversation ? 'hidden md:flex' : 'flex'
+                        } w-full md:w-80 lg:w-96 flex-col border-r border-glass-border bg-surface/50`}
+                >
                     <div className="p-4 border-b border-glass-border">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+                            <Search
+                                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+                                size={18}
+                            />
                             <input
                                 type="text"
                                 placeholder="Search chats..."
@@ -445,63 +564,130 @@ export default function MessagesPage() {
 
                     <div className="flex-1 overflow-y-auto p-2 space-y-1">
                         {isLoading ? (
-                            <div className="text-center p-4 text-text-secondary">Loading...</div>
+                            <div className="text-center p-4 text-text-secondary">
+                                Loading...
+                            </div>
                         ) : conversations.length === 0 ? (
-                            <div className="text-center p-4 text-text-secondary">No conversations yet.</div>
+                            <div className="text-center p-4 text-text-secondary">
+                                No conversations yet.
+                            </div>
                         ) : (
-                            conversations.map((conv) => (
-                                <div
-                                    key={conv._id}
-                                    onClick={() => setActiveConversation(conv)}
-                                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${activeConversation?._id === conv._id ? 'bg-primary/10 border border-primary/20' : 'hover:bg-glass-bg border border-transparent'}`}
-                                >
-                                    <img
-                                        src={conv.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv._id}`}
-                                        alt={conv.user.displayName}
-                                        className="w-10 h-10 rounded-full bg-gray-700 object-cover"
-                                    />
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <h4 className="font-medium truncate text-sm">{conv.user.displayName}</h4>
-                                            <span className="text-xs text-text-secondary">
-                                                {new Date(conv.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <p className={`text-xs truncate ${conv.unreadCount > 0 ? 'font-bold text-text-primary' : 'text-text-secondary'}`}>
-                                                {conv.lastMessage.senderId === user?._id ? 'You: ' : ''}{conv.lastMessage.text}
-                                            </p>
-                                            {conv.unreadCount > 0 && (
-                                                <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ml-2">
-                                                    {conv.unreadCount}
-                                                </span>
-                                            )}
+                            conversations.map((conv) => {
+                                const lastMessage = conv.lastMessage;
+                                const lastMessageTime = lastMessage?.timestamp
+                                    ? new Date(
+                                        lastMessage.timestamp
+                                    ).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                    })
+                                    : '';
+
+                                const lastText =
+                                    lastMessage?.text?.trim() || 'No messages yet';
+
+                                const fromMe =
+                                    lastMessage?.senderId &&
+                                    user &&
+                                    lastMessage.senderId === user._id;
+
+                                if (!conv.user) return null;
+
+                                return (
+                                    <div
+                                        key={conv._id}
+                                        onClick={() => setActiveConversation(conv)}
+                                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${activeConversation?._id === conv._id
+                                            ? 'bg-primary/10 border border-primary/20'
+                                            : 'hover:bg-glass-bg border border-transparent'
+                                            }`}
+                                    >
+                                        <img
+                                            src={
+                                                conv.user.avatarUrl ||
+                                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv._id}`
+                                            }
+                                            alt={conv.user.displayName}
+                                            className="w-10 h-10 rounded-full bg-gray-700 object-cover"
+                                        />
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <h4 className="font-medium truncate text-sm">
+                                                    {conv.user.displayName}
+                                                </h4>
+                                                {lastMessageTime && (
+                                                    <span className="text-xs text-text-secondary">
+                                                        {lastMessageTime}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <p
+                                                    className={`text-xs truncate ${conv.unreadCount > 0
+                                                        ? 'font-bold text-text-primary'
+                                                        : 'text-text-secondary'
+                                                        }`}
+                                                >
+                                                    {fromMe ? 'You: ' : ''}
+                                                    {lastText}
+                                                </p>
+                                                {conv.unreadCount > 0 && (
+                                                    <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ml-2">
+                                                        {conv.unreadCount}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         )}
                     </div>
                 </div>
 
                 {/* Chat Area */}
                 {activeConversation ? (
-                    <div className={`${activeConversation ? 'flex' : 'hidden md:flex'} flex-1 flex-col bg-surface`}>
+                    <div
+                        className={`${activeConversation ? 'flex' : 'hidden md:flex'
+                            } flex-1 flex-col bg-surface`}
+                    >
                         {/* Header */}
                         <div className="p-4 border-b border-glass-border flex items-center gap-3 bg-surface/80 backdrop-blur-md">
-                            <button onClick={() => setActiveConversation(null)} className="md:hidden p-2 hover:bg-glass-bg rounded-full">
+                            <button
+                                onClick={() => setActiveConversation(null)}
+                                className="md:hidden p-2 hover:bg-glass-bg rounded-full"
+                            >
                                 <ArrowLeft size={20} />
                             </button>
                             <img
-                                src={activeConversation.user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${activeConversation._id}`}
+                                src={
+                                    activeConversation.user.avatarUrl ||
+                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${activeConversation._id}`
+                                }
                                 alt={activeConversation.user.displayName}
                                 className="w-10 h-10 rounded-full bg-gray-700 object-cover"
                             />
                             <div>
-                                <h3 className="font-bold">{activeConversation.user.displayName}</h3>
-                                <p className={`text-xs flex items-center gap-1 ${onlineUsers.has(activeConversation._id) ? 'text-green-500' : 'text-gray-400'}`}>
-                                    <span className={`w-2 h-2 rounded-full ${onlineUsers.has(activeConversation._id) ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                                    {onlineUsers.has(activeConversation._id) ? 'Online' : 'Offline'}
+                                <h3 className="font-bold">
+                                    {activeConversation.user.displayName}
+                                </h3>
+                                <p
+                                    className={`text-xs flex items-center gap-1 ${onlineUsers.has(activeConversation._id)
+                                        ? 'text-green-500'
+                                        : 'text-gray-400'
+                                        }`}
+                                >
+                                    <span
+                                        className={`w-2 h-2 rounded-full ${onlineUsers.has(
+                                            activeConversation._id
+                                        )
+                                            ? 'bg-green-500'
+                                            : 'bg-gray-400'
+                                            }`}
+                                    ></span>
+                                    {onlineUsers.has(activeConversation._id)
+                                        ? 'Online'
+                                        : 'Offline'}
                                 </p>
                             </div>
                         </div>
@@ -511,12 +697,42 @@ export default function MessagesPage() {
                             {messages.map((msg) => {
                                 const isMe = msg.senderId === user?._id;
                                 return (
-                                    <div key={msg._id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                        <div className={`max-w-[70%] rounded-2xl px-4 py-2 ${isMe ? 'bg-primary text-white rounded-tr-none' : 'bg-surface border border-glass-border rounded-tl-none'}`}>
-                                            <p className="text-sm">{msg.text}</p>
-                                            <p className={`text-[10px] mt-1 ${isMe ? 'text-white/70' : 'text-text-secondary'}`}>
-                                                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    <div
+                                        key={msg._id}
+                                        className={`flex ${isMe
+                                            ? 'justify-end'
+                                            : 'justify-start'
+                                            }`}
+                                    >
+                                        <div
+                                            className={`max-w-[70%] rounded-2xl px-4 py-2 ${isMe
+                                                ? 'bg-primary text-white rounded-tr-none'
+                                                : 'bg-surface border border-glass-border rounded-tl-none'
+                                                }`}
+                                        >
+                                            <p className="text-sm">
+                                                {msg.text}
                                             </p>
+                                            <p
+                                                className={`text-[10px] mt-1 ${isMe
+                                                    ? 'text-white/70'
+                                                    : 'text-text-secondary'
+                                                    }`}
+                                            >
+                                                {new Date(
+                                                    msg.timestamp
+                                                ).toLocaleTimeString([], {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </p>
+                                            {isMe && (
+                                                <div className="flex justify-end mt-1">
+                                                    {msg.status === 'pending' && <Clock size={12} className="text-white/70" />}
+                                                    {msg.status === 'sent' && <Check size={12} className="text-white/70" />}
+                                                    {msg.status === 'read' && <CheckCheck size={12} className="text-blue-200" />}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -526,12 +742,17 @@ export default function MessagesPage() {
 
                         {/* Input or Friend Request */}
                         {canSend ? (
-                            <form onSubmit={handleSendMessage} className="p-4 border-t border-glass-border bg-surface">
+                            <form
+                                onSubmit={handleSendMessage}
+                                className="p-4 border-t border-glass-border bg-surface"
+                            >
                                 <div className="flex gap-2">
                                     <input
                                         type="text"
                                         value={inputText}
-                                        onChange={(e) => setInputText(e.target.value)}
+                                        onChange={(e) =>
+                                            setInputText(e.target.value)
+                                        }
                                         placeholder="Type a message..."
                                         className="flex-1 bg-glass-bg border border-glass-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
                                     />
@@ -546,9 +767,14 @@ export default function MessagesPage() {
                             </form>
                         ) : (
                             <div className="p-4 border-t border-glass-border bg-surface flex flex-col items-center justify-center gap-2">
-                                <p className="text-sm text-text-secondary">You can only chat with friends.</p>
+                                <p className="text-sm text-text-secondary">
+                                    You can only chat with friends.
+                                </p>
                                 {friendRequestStatus === 'pending' ? (
-                                    <button disabled className="px-4 py-2 bg-gray-500 text-white rounded-xl text-sm font-medium cursor-not-allowed">
+                                    <button
+                                        disabled
+                                        className="px-4 py-2 bg-gray-500 text-white rounded-xl text-sm font-medium cursor-not-allowed"
+                                    >
                                         Request Sent
                                     </button>
                                 ) : friendRequestStatus === 'received' ? (
@@ -574,7 +800,9 @@ export default function MessagesPage() {
                         <div className="w-24 h-24 bg-glass-bg rounded-full flex items-center justify-center mb-6">
                             <MessageSquare size={48} className="text-primary/50" />
                         </div>
-                        <h3 className="text-xl font-bold text-text-primary mb-2">Your Messages</h3>
+                        <h3 className="text-xl font-bold text-text-primary mb-2">
+                            Your Messages
+                        </h3>
                         <p>Select a conversation to start chatting</p>
                     </div>
                 )}
@@ -582,3 +810,4 @@ export default function MessagesPage() {
         </div>
     );
 }
+
