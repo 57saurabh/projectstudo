@@ -19,6 +19,7 @@ interface Conversation {
         timestamp: string;
         senderId: string;
     };
+    unreadCount: number;
 }
 
 interface Message {
@@ -31,7 +32,7 @@ interface Message {
 
 export default function MessagesPage() {
     const { user, token } = useSelector((state: RootState) => state.auth);
-    const { socket, sendMessage } = useSignaling();
+    const { socket, sendMessage, markAsRead } = useSignaling();
 
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [activeConversation, setActiveConversation] = useState<Conversation | null>(null);
@@ -76,7 +77,8 @@ export default function MessagesPage() {
                                     text: '',
                                     timestamp: new Date().toISOString(),
                                     senderId: ''
-                                }
+                                },
+                                unreadCount: 0
                             };
                             setConversations(prev => [newConv, ...prev]);
                             setActiveConversation(newConv);
@@ -107,12 +109,21 @@ export default function MessagesPage() {
                 });
                 setMessages(res.data);
                 scrollToBottom();
+
+                // Mark as read if there are unread messages
+                if (activeConversation.unreadCount > 0) {
+                    markAsRead(activeConversation._id);
+                    // Update local state to clear badge
+                    setConversations(prev => prev.map(c =>
+                        c._id === activeConversation._id ? { ...c, unreadCount: 0 } : c
+                    ));
+                }
             } catch (error) {
                 console.error('Failed to fetch messages', error);
             }
         };
         fetchMessages();
-    }, [activeConversation, token]);
+    }, [activeConversation, token, markAsRead]);
 
     // Handle Real-time Messages
     useEffect(() => {
@@ -131,18 +142,31 @@ export default function MessagesPage() {
                 scrollToBottom();
             }
 
-            // Update conversations list (Last Message)
+            // Update conversations list (Last Message & Unread Count)
             setConversations(prev => {
                 const existing = prev.find(c => c._id === data.senderId);
                 if (existing) {
+                    const isChatOpen = activeConversation?._id === data.senderId;
+
+                    // If chat is open, we mark as read immediately (or let the effect handle it? Effect only runs on change)
+                    // Better: If chat is open, unreadCount stays 0. If closed, increment.
+                    // Actually, if chat is open, we should probably call markAsRead again? 
+                    // For simplicity, if chat is open, we assume it's read.
+                    if (isChatOpen) {
+                        markAsRead(data.senderId);
+                    }
+
                     return [
-                        { ...existing, lastMessage: { text: data.text, timestamp: new Date().toISOString(), senderId: data.senderId } },
+                        {
+                            ...existing,
+                            lastMessage: { text: data.text, timestamp: new Date().toISOString(), senderId: data.senderId },
+                            unreadCount: isChatOpen ? 0 : (existing.unreadCount || 0) + 1
+                        },
                         ...prev.filter(c => c._id !== data.senderId)
                     ];
                 }
-                // If new conversation (not in list), we might want to refetch or manually add if we have user details
-                // For now, let's just refetch to be safe and simple
-                // fetchConversations(); 
+                // If new conversation, we should fetch it.
+                // For now, return prev.
                 return prev;
             });
         };
@@ -235,7 +259,8 @@ export default function MessagesPage() {
                     text: '',
                     timestamp: new Date().toISOString(),
                     senderId: ''
-                }
+                },
+                unreadCount: 0
             };
             setConversations(prev => [newConv, ...prev]);
             setActiveConversation(newConv);
@@ -331,9 +356,16 @@ export default function MessagesPage() {
                                                 {new Date(conv.lastMessage.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             </span>
                                         </div>
-                                        <p className="text-xs text-text-secondary truncate">
-                                            {conv.lastMessage.senderId === user?._id ? 'You: ' : ''}{conv.lastMessage.text}
-                                        </p>
+                                        <div className="flex justify-between items-center">
+                                            <p className={`text-xs truncate ${conv.unreadCount > 0 ? 'font-bold text-text-primary' : 'text-text-secondary'}`}>
+                                                {conv.lastMessage.senderId === user?._id ? 'You: ' : ''}{conv.lastMessage.text}
+                                            </p>
+                                            {conv.unreadCount > 0 && (
+                                                <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ml-2">
+                                                    {conv.unreadCount}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))

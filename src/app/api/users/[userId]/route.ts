@@ -5,7 +5,8 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-export async function GET(req: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ userId: string }> }) {
+    const params = await props.params;
     try {
         await dbConnect();
 

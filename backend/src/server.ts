@@ -20,21 +20,29 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-// Connect to MongoDB
-const MONGO_URI = process.env.MONGO_URI || '';
-if (MONGO_URI) {
-    mongoose.connect(MONGO_URI)
-        .then(() => console.log('✅ Connected to MongoDB'))
-        .catch(err => console.error('❌ MongoDB Connection Error:', err));
-} else {
-    console.warn('⚠️ MONGO_URI not found in .env');
-}
-
-// Initialize WebSocket Gateway
-new SocketGateway(io);
-
 const PORT = process.env.PORT || 4000;
 
-server.listen(PORT, () => {
-    console.log(`🚀 Backend Server running on port ${PORT}`);
-});
+async function startServer() {
+    try {
+        // Connect to MongoDB
+        const MONGO_URI = process.env.MONGO_URI || '';
+        if (!MONGO_URI) {
+            throw new Error('MONGO_URI not found in .env');
+        }
+
+        await mongoose.connect(MONGO_URI);
+        console.log('✅ Connected to MongoDB');
+
+        // Initialize WebSocket Gateway
+        new SocketGateway(io);
+
+        server.listen(PORT, () => {
+            console.log(`🚀 Backend Server running on port ${PORT}`);
+        });
+    } catch (error) {
+        console.error('❌ Failed to start server:', error);
+        process.exit(1);
+    }
+}
+
+startServer();

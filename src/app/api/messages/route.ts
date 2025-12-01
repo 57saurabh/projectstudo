@@ -53,13 +53,36 @@ export async function GET(req: NextRequest) {
             {
                 $unwind: '$user'
             },
+            // Lookup unread count
+            {
+                $lookup: {
+                    from: 'messages',
+                    let: { senderId: '$_id', myId: userId },
+                    pipeline: [
+                        {
+                            $match: {
+                                $expr: {
+                                    $and: [
+                                        { $eq: ['$senderId', '$$senderId'] },
+                                        { $eq: ['$receiverId', '$$myId'] },
+                                        { $eq: ['$isRead', false] }
+                                    ]
+                                }
+                            }
+                        },
+                        { $count: 'count' }
+                    ],
+                    as: 'unreadInfo'
+                }
+            },
             {
                 $project: {
                     _id: 1,
                     'user.displayName': 1,
                     'user.username': 1,
                     'user.avatarUrl': 1,
-                    lastMessage: 1
+                    lastMessage: 1,
+                    unreadCount: { $ifNull: [{ $arrayElemAt: ['$unreadInfo.count', 0] }, 0] }
                 }
             },
             {
