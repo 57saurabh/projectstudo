@@ -20,6 +20,7 @@ export class SocketGateway {
     private userStartTimes: Map<string, number> = new Map();
     private userReputations: Map<string, number> = new Map();
     private userNames: Map<string, string> = new Map(); // Track display names
+    private socketToUserId: Map<string, string> = new Map(); // Map socketId -> userId (DB _id)
     private activeMatches: Map<string, Set<string>> = new Map(); // Track active connections: userId -> Set<peerId>
     private pendingMatches: Map<string, Set<string>> = new Map(); // Track pending proposals: matchId (initiatorId) -> Set<userId> (accepted)
     private matchProposals: Map<string, Set<string>> = new Map(); // Track who is proposed to whom: userId -> Set<peerId>
@@ -40,10 +41,17 @@ export class SocketGateway {
             console.log(`User connected: ${socket.id}`);
 
             // Store display name (prioritize username)
+            // Store display name (prioritize username)
             const displayName = socket.handshake.query.displayName as string;
             const username = socket.handshake.query.username as string;
+            const userId = socket.handshake.query.userId as string;
+
             // Use username if available, otherwise fallback to displayName or 'Stranger'
             this.userNames.set(socket.id, username || displayName || 'Stranger');
+
+            if (userId) {
+                this.socketToUserId.set(socket.id, userId);
+            }
 
             // Initialize reputation if new
             if (!this.userReputations.has(socket.id)) {
@@ -88,10 +96,23 @@ export class SocketGateway {
                     this.pendingMatches.set(matchKey, new Set());
 
                     // Fetch full user details for profile display
-                    const [socketUser, matchUser] = await Promise.all([
-                        UserModel.findById(socket.id).select('username bio country language'),
-                        UserModel.findById(match).select('username bio country language')
-                    ]);
+                    // Fetch full user details for profile display
+                    const currentUserId = this.socketToUserId.get(socket.id);
+                    const matchUserId = this.socketToUserId.get(match);
+
+                    let socketUser = null;
+                    let matchUser = null;
+
+                    if (currentUserId && matchUserId) {
+                        try {
+                            [socketUser, matchUser] = await Promise.all([
+                                UserModel.findById(currentUserId).select('username bio country language'),
+                                UserModel.findById(matchUserId).select('username bio country language')
+                            ]);
+                        } catch (err) {
+                            console.error('Error fetching user details:', err);
+                        }
+                    }
 
                     // Notify both users with profile info (PROPOSED)
                     this.io.to(socket.id).emit('match-proposed', {
@@ -349,6 +370,7 @@ export class SocketGateway {
                 this.updateReputation(socket.id); // Update rep on disconnect
                 this.matchmakingService.removeFromQueue(socket.id);
                 this.userNames.delete(socket.id); // Cleanup name
+                this.socketToUserId.delete(socket.id); // Cleanup userId mapping
                 this.io.emit('user-count', this.io.engine.clientsCount);
             });
         });
