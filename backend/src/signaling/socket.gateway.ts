@@ -26,15 +26,7 @@ export class SocketGateway {
     private pendingMatches: Map<string, Set<string>> = new Map();
     private matchProposals: Map<string, Set<string>> = new Map();
 
-    private encryptMessage(text: string): string {
-        const algorithm = 'aes-256-cbc';
-        const key = crypto.scryptSync(process.env.JWT_SECRET || 'secret', 'salt', 32);
-        const iv = crypto.randomBytes(16);
-        const cipher = crypto.createCipheriv(algorithm, key, iv);
-        let encrypted = cipher.update(text, 'utf8', 'hex');
-        encrypted += cipher.final('hex');
-        return iv.toString('hex') + ':' + encrypted;
-    }
+
 
     private initialize() {
         this.io.on('connection', (socket: Socket) => {
@@ -206,12 +198,12 @@ export class SocketGateway {
                         "participants.userId": { $all: [senderUserId, target] }
                     });
 
-                    const encryptedMessage = this.encryptMessage(filteredMessage);
+
 
                     const newMessage = {
                         senderId: senderUserId,
                         receiverId: target,
-                        text: encryptedMessage,
+                        text: filteredMessage,
                         timestamp: new Date(),
                         isRead: false
                     };
@@ -237,14 +229,14 @@ export class SocketGateway {
 
                     this.io.to(target).emit('chat-message', {
                         senderId: senderUserId,
-                        text: encryptedMessage,
+                        text: filteredMessage,
                         timestamp: newMessage.timestamp.toISOString(),
                         conversationId: conversation._id
                     });
 
                     socket.emit('message-sent', {
                         receiverId: target,
-                        text: encryptedMessage,
+                        text: filteredMessage,
                         timestamp: newMessage.timestamp.toISOString(),
                         conversationId: conversation._id
                     });
