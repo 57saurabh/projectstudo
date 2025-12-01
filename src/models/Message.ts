@@ -16,4 +16,5 @@ const MessageSchema: Schema = new Schema({
     isRead: { type: Boolean, default: false }
 });
 
-export default mongoose.model<IMessage>('Message', MessageSchema);
+// Prevent OverwriteModelError
+export const MessageModel = mongoose.models.Message || mongoose.model<IMessage>('Message', MessageSchema);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
-import Message from '@backend/src/chat/message.model';
+import { MessageModel as Message } from '@/models/Message';
 import { UserModel as User } from '@/models/User';
 import jwt from 'jsonwebtoken';
 

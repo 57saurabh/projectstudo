@@ -21,12 +21,14 @@ import { useDispatch } from 'react-redux';
 import { logout } from '@/lib/store/authSlice';
 import { useRouter } from 'next/navigation';
 import { useSidebar } from '@/components/layout/SidebarContext';
+import { useSignaling } from '@/lib/webrtc/useSignaling';
 
 export default function Sidebar() {
     const { isOpen, toggleSidebar, closeSidebar } = useSidebar();
     const pathname = usePathname();
     const dispatch = useDispatch();
     const router = useRouter();
+    const { unreadCount } = useSignaling();
 
     const handleLogout = () => {
         dispatch(logout() as any);

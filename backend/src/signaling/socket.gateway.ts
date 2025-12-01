@@ -325,7 +325,32 @@ export class SocketGateway {
                         senderId: socket.id,
                         receiverId: target,
                         text: encryptedText,
-                        timestamp: new Date()
+                        timestamp: new Date(),
+                        isRead: false
+                    });
+
+                    // Handle Mark Messages as Read
+                    socket.on('mark-read', async (data) => {
+                        const { senderId } = data; // The user whose messages I am reading (i.e., the other person)
+
+                        // Update DB
+                        try {
+                            await Message.updateMany(
+                                { senderId: senderId, receiverId: socket.id, isRead: false },
+                                { $set: { isRead: true } }
+                            );
+
+                            // Notify the sender that their messages were read
+                            if (this.io.sockets.sockets.has(senderId)) {
+                                // Or use room if we switched to rooms
+                                this.io.to(senderId).emit('messages-read', { readerId: socket.id });
+                            } else {
+                                // Try room just in case
+                                this.io.to(senderId).emit('messages-read', { readerId: socket.id });
+                            }
+                        } catch (err) {
+                            console.error('Failed to mark messages as read:', err);
+                        }
                     });
                     console.log('Message saved to DB (Encrypted)');
                 } catch (err) {

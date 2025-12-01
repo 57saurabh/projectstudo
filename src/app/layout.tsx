@@ -5,6 +5,7 @@ import { ReduxProvider } from "@/lib/store/ReduxProvider";
 import NotificationManager from '@/components/notifications/NotificationManager';
 import { ThemeProvider } from "@/lib/context/ThemeContext";
 import { SidebarProvider } from "@/components/layout/SidebarContext";
+import { SignalingProvider } from "@/lib/webrtc/SignalingContext";
 import AuthGuard from "@/components/auth/AuthGuard";
 import AppLayout from "@/components/layout/AppLayout";
 import { CameraGuard } from '@/components/utils/CameraGuard';
@@ -27,16 +28,18 @@ export default function RootLayout({
       <body className={`${inter.variable} bg-background text-white min-h-screen overflow-hidden`} suppressHydrationWarning>
         <ReduxProvider>
           <ThemeProvider>
-            <NotificationManager />
-            <SidebarProvider>
-              <AuthInitializer />
-              <CameraGuard />
-              <AuthGuard>
-                <AppLayout>
-                  {children}
-                </AppLayout>
-              </AuthGuard>
-            </SidebarProvider>
+            <SignalingProvider>
+              <NotificationManager />
+              <SidebarProvider>
+                <AuthInitializer />
+                <CameraGuard />
+                <AuthGuard>
+                  <AppLayout>
+                    {children}
+                  </AppLayout>
+                </AuthGuard>
+              </SidebarProvider>
+            </SignalingProvider>
           </ThemeProvider>
         </ReduxProvider>
       </body>
