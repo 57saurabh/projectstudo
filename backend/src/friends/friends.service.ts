@@ -12,7 +12,7 @@ export class FriendService {
     async sendFriendRequest(senderId: string, receiverId: string) {
         // Check if already friends
         const sender = await UserModel.findById(senderId);
-        if (sender?.friends.includes(receiverId)) {
+        if (sender?.friends.some((id: any) => id.toString() === receiverId)) {
             throw new Error('Already friends');
         }
 
@@ -86,6 +86,6 @@ export class FriendService {
 
     async areFriends(userA: string, userB: string): Promise<boolean> {
         const user = await UserModel.findById(userA);
-        return user?.friends.includes(userB) || false;
+        return user?.friends.some((id: any) => id.toString() === userB) || false;
     }
 }

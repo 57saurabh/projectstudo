@@ -38,29 +38,37 @@ export async function GET(req: NextRequest, props: { params: Promise<{ userId: s
         const decoded: any = jwt.verify(token, JWT_SECRET);
         const currentUserId = decoded.userId;
         const targetUserId = params.userId;
+        const { ConversationModel } = await import('@/models/Conversation');
 
-        const messages = await Message.find({
-            $or: [
-                { senderId: currentUserId, receiverId: targetUserId },
-                { senderId: targetUserId, receiverId: currentUserId }
-            ]
-        }).sort({ timestamp: 1 });
+        const conversation = await ConversationModel.findOne({
+            "participants.userId": { $all: [currentUserId, targetUserId] }
+        }).sort({ 'messages.timestamp': 1 }); // Sort messages within the conversation
 
-        // Decrypt messages before sending
-        const decryptedMessages = messages.map(msg => ({
-            ...msg.toObject(),
-            text: decryptMessage(msg.text)
-        }));
+        let decryptedMessages: any[] = [];
+        let requestId = undefined; // Initialize requestId here
+
+        if (conversation) {
+            decryptedMessages = conversation.messages.map((msg: any) => {
+                return {
+                    _id: msg._id,
+                    senderId: msg.senderId,
+                    receiverId: msg.receiverId,
+                    text: decryptMessage(msg.text), // Decrypt message text
+                    timestamp: msg.timestamp,
+                    isRead: msg.isRead
+                };
+            });
+        }
 
         // Check if friends
         const { UserModel } = await import('@/models/User');
         const { FriendRequestModel } = await import('@/models/FriendRequest'); // Dynamic import to avoid circular deps if any
 
         const currentUser = await UserModel.findById(currentUserId);
-        const canSend = currentUser?.friends.includes(targetUserId) || false;
+        const canSend = currentUser?.friends.some((id: any) => id.toString() === targetUserId) || false;
 
         let requestStatus = 'none';
-        let requestId = undefined;
+        // requestId is already initialized above
 
         if (!canSend) {
             const pendingRequest = await FriendRequestModel.findOne({

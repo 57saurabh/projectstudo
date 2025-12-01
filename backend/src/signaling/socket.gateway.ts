@@ -318,7 +318,7 @@ export class SocketGateway {
                 }
 
                 const sender = await UserModel.findById(senderUserId);
-                if (!sender || !sender.friends.includes(target)) {
+                if (!sender || !sender.friends.some((id: any) => id.toString() === target)) {
                     // Not friends!
                     socket.emit('error', { code: 'NOT_FRIENDS', message: 'Messaging allowed only between friends.' });
                     return;
@@ -327,181 +327,235 @@ export class SocketGateway {
                 // Moderate Message
                 const filteredMessage = this.moderationService.filterContent(message);
 
-                // 1. Relay to target (Real-time)
-                const senderName = this.userNames.get(socket.id) || 'Stranger';
-                socket.to(target).emit('chat-message', {
-                    senderId: senderUserId, // Use real User ID
-                    senderName: senderName,
-                    text: filteredMessage
-                });
-
-                // 2. Persist to DB (Encrypted)
                 try {
-                    const encryptedText = this.encryptMessage(filteredMessage);
-                    await Message.create({
-                        senderId: socket.id,
+                    // 4. Save to DB (Conversation Model)
+                    const { ConversationModel } = await import('../models/Conversation');
+
+                    // Find conversation with both participants
+                    let conversation = await ConversationModel.findOne({
+                        "participants.userId": { $all: [senderUserId, target] }
+                    });
+
+                    const encryptedMessage = this.encryptMessage(filteredMessage);
+
+                    const newMessage = {
+                        senderId: senderUserId,
                         receiverId: target,
-                        text: encryptedText,
+                        text: encryptedMessage,
                         timestamp: new Date(),
                         isRead: false
-                    });
+                    };
 
-                    // Handle Mark Messages as Read
-                    socket.on('mark-read', async (data) => {
-                        const { senderId } = data; // The user whose messages I am reading (i.e., the other person)
-
-                        // Update DB
-                        try {
-                            await Message.updateMany(
-                                { senderId: senderId, receiverId: socket.id, isRead: false },
-                                { $set: { isRead: true } }
-                            );
-
-                            // Notify the sender that their messages were read
-                            if (this.io.sockets.sockets.has(senderId)) {
-                                // Or use room if we switched to rooms
-                                this.io.to(senderId).emit('messages-read', { readerId: socket.id });
-                            } else {
-                                // Try room just in case
-                                this.io.to(senderId).emit('messages-read', { readerId: socket.id });
+                    if (!conversation) {
+                        conversation = await ConversationModel.create({
+                            participants: [{ userId: senderUserId }, { userId: target }],
+                            messages: [newMessage],
+                            lastMessage: newMessage,
+                            unreadCount: {
+                                [senderUserId]: 0,
+                                [target]: 1
                             }
-                        } catch (err) {
-                            console.error('Failed to mark messages as read:', err);
-                        }
+                        });
+                    } else {
+                        conversation.messages.push(newMessage);
+                        conversation.lastMessage = newMessage;
+
+                        // Increment unread count for receiver
+                        const currentUnread = conversation.unreadCount.get(target) || 0;
+                        conversation.unreadCount.set(target, currentUnread + 1);
+
+                        await conversation.save();
+                    }
+
+                    // 5. Emit to receiver
+                    this.io.to(target).emit('chat-message', {
+                        senderId: senderUserId,
+                        text: encryptedMessage,
+                        timestamp: newMessage.timestamp.toISOString(),
+                        conversationId: conversation._id
                     });
-                    console.log('Message saved to DB (Encrypted)');
-                } catch (err) {
-                    console.error('Failed to save message:', err);
+
+                    // 6. Emit to sender (ack)
+                    socket.emit('message-sent', {
+                        receiverId: target,
+                        text: encryptedMessage,
+                        timestamp: newMessage.timestamp.toISOString(),
+                        conversationId: conversation._id
+                    });
+
+                } catch (error) {
+                    console.error('Chat error:', error);
+                    socket.emit('error', { message: 'Failed to send message' });
                 }
             });
+
+            // Handle Mark as Read
+            socket.on('mark-read', async (data: { senderId: string }) => {
+                const userId = this.socketToUserId.get(socket.id);
+                if (!userId) return;
+
+                try {
+                    const { ConversationModel } = await import('../models/Conversation');
+
+                    const conversation = await ConversationModel.findOne({
+                        "participants.userId": { $all: [userId, data.senderId] }
+                    });
+
+                    if (conversation) {
+                        // Reset unread count for current user
+                        conversation.unreadCount.set(userId, 0);
+
+                        // Mark specific messages as read (optional, but good for history)
+                        conversation.messages.forEach((msg: any) => {
+                            if (msg.receiverId === userId && !msg.isRead) {
+                                msg.isRead = true;
+                            }
+                        });
+
+                        await conversation.save();
+
+                        // Notify sender that messages were read
+                        const senderSocketId = this.userIdToSocket.get(data.senderId);
+                        if (senderSocketId) {
+                            this.io.to(senderSocketId).emit('messages-read', {
+                                readerId: userId,
+                                conversationId: conversation._id
+                            });
+                        }
+                    });
+            console.log('Message saved to DB (Encrypted)');
+        } catch (err) {
+            console.error('Failed to save message:', err);
+        }
+    });
 
             // ...
 
             // Handle Skip Match
             socket.on('skip-match', async (data) => {
-                const { target } = data;
-                this.handleDisconnection(socket.id, target);
+    const { target } = data;
+    this.handleDisconnection(socket.id, target);
 
-                // Re-enter queue automatically
-                await this.matchmakingService.addToQueue(socket.id);
+    // Re-enter queue automatically
+    await this.matchmakingService.addToQueue(socket.id);
 
-                // Trigger find match logic again
-                const match = await this.matchmakingService.findMatch(socket.id);
-                if (match) {
-                    // Create a proposal instead of active match
-                    if (!this.matchProposals.has(socket.id)) this.matchProposals.set(socket.id, new Set());
-                    if (!this.matchProposals.has(match)) this.matchProposals.set(match, new Set());
+    // Trigger find match logic again
+    const match = await this.matchmakingService.findMatch(socket.id);
+    if (match) {
+        // Create a proposal instead of active match
+        if (!this.matchProposals.has(socket.id)) this.matchProposals.set(socket.id, new Set());
+        if (!this.matchProposals.has(match)) this.matchProposals.set(match, new Set());
 
-                    this.matchProposals.get(socket.id)!.add(match);
-                    this.matchProposals.get(match)!.add(socket.id);
+        this.matchProposals.get(socket.id)!.add(match);
+        this.matchProposals.get(match)!.add(socket.id);
 
-                    // Initialize pending acceptance set
-                    const matchKey = [socket.id, match].sort().join(':');
-                    this.pendingMatches.set(matchKey, new Set());
+        // Initialize pending acceptance set
+        const matchKey = [socket.id, match].sort().join(':');
+        this.pendingMatches.set(matchKey, new Set());
 
-                    // Notify both users with profile info (PROPOSED)
-                    this.io.to(socket.id).emit('match-proposed', {
-                        peerId: match,
-                        initiator: true,
-                        reputation: this.userReputations.get(match) || 100,
-                        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${match}`
-                    });
-                    this.io.to(match).emit('match-proposed', {
-                        peerId: socket.id,
-                        initiator: false,
-                        reputation: this.userReputations.get(socket.id) || 100,
-                        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${socket.id}`
-                    });
-                }
-            });
+        // Notify both users with profile info (PROPOSED)
+        this.io.to(socket.id).emit('match-proposed', {
+            peerId: match,
+            initiator: true,
+            reputation: this.userReputations.get(match) || 100,
+            avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${match}`
+        });
+        this.io.to(match).emit('match-proposed', {
+            peerId: socket.id,
+            initiator: false,
+            reputation: this.userReputations.get(socket.id) || 100,
+            avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${socket.id}`
+        });
+    }
+});
 
-            socket.on('disconnect', () => {
-                console.log(`User disconnected: ${socket.id}`);
-                this.handleDisconnection(socket.id);
-                this.updateReputation(socket.id); // Update rep on disconnect
-                this.matchmakingService.removeFromQueue(socket.id);
-                this.userNames.delete(socket.id); // Cleanup name
-                this.socketToUserId.delete(socket.id); // Cleanup userId mapping
-                this.io.emit('user-count', this.io.engine.clientsCount);
-            });
+socket.on('disconnect', () => {
+    console.log(`User disconnected: ${socket.id}`);
+    this.handleDisconnection(socket.id);
+    this.updateReputation(socket.id); // Update rep on disconnect
+    this.matchmakingService.removeFromQueue(socket.id);
+    this.userNames.delete(socket.id); // Cleanup name
+    this.socketToUserId.delete(socket.id); // Cleanup userId mapping
+    this.io.emit('user-count', this.io.engine.clientsCount);
+});
         });
     }
 
-    private handleDisconnection(userId: string, specificTarget?: string) {
-        // Cleanup Pending Matches
-        for (const [key, pendingSet] of this.pendingMatches.entries()) {
-            if (key.includes(userId)) {
-                // If specific target, only remove if key involves target
-                if (specificTarget && !key.includes(specificTarget)) continue;
+    private handleDisconnection(userId: string, specificTarget ?: string) {
+    // Cleanup Pending Matches
+    for (const [key, pendingSet] of this.pendingMatches.entries()) {
+        if (key.includes(userId)) {
+            // If specific target, only remove if key involves target
+            if (specificTarget && !key.includes(specificTarget)) continue;
 
-                const [userA, userB] = key.split(':');
-                const otherUser = userA === userId ? userB : userA;
+            const [userA, userB] = key.split(':');
+            const otherUser = userA === userId ? userB : userA;
 
-                // Notify other user that proposal is cancelled
-                this.io.to(otherUser).emit('match-cancelled');
+            // Notify other user that proposal is cancelled
+            this.io.to(otherUser).emit('match-cancelled');
 
-                this.pendingMatches.delete(key);
-            }
-        }
-
-        // Cleanup Proposals
-        if (this.matchProposals.has(userId)) {
-            const proposedPeers = this.matchProposals.get(userId)!;
-            proposedPeers.forEach(peerId => {
-                if (specificTarget && peerId !== specificTarget) return;
-
-                if (this.matchProposals.has(peerId)) {
-                    this.matchProposals.get(peerId)!.delete(userId);
-                }
-            });
-            if (!specificTarget) this.matchProposals.delete(userId);
-            else proposedPeers.delete(specificTarget);
-        }
-
-        const peers = this.activeMatches.get(userId);
-        if (!peers) return;
-
-        // If specific target (skip match), only handle that one
-        const targets = specificTarget ? [specificTarget] : Array.from(peers);
-
-        targets.forEach(peerId => {
-            if (peers.has(peerId)) {
-                const peerPeers = this.activeMatches.get(peerId);
-
-                // P2P Logic: If peer has only 1 connection (us), it's a 1-on-1 call
-                if (peerPeers && peerPeers.size === 1 && peerPeers.has(userId)) {
-                    // Force disconnect the peer (send them back to searching)
-                    this.io.to(peerId).emit('force-disconnect');
-
-                    // Cleanup
-                    peerPeers.delete(userId);
-                    this.activeMatches.delete(peerId);
-                } else {
-                    // Group Logic: Just notify peer we left
-                    this.io.to(peerId).emit('peer-left', { peerId: userId });
-                    if (peerPeers) peerPeers.delete(userId);
-                }
-
-                peers.delete(peerId);
-            }
-        });
-
-        if (peers.size === 0) {
-            this.activeMatches.delete(userId);
+            this.pendingMatches.delete(key);
         }
     }
+
+    // Cleanup Proposals
+    if (this.matchProposals.has(userId)) {
+        const proposedPeers = this.matchProposals.get(userId)!;
+        proposedPeers.forEach(peerId => {
+            if (specificTarget && peerId !== specificTarget) return;
+
+            if (this.matchProposals.has(peerId)) {
+                this.matchProposals.get(peerId)!.delete(userId);
+            }
+        });
+        if (!specificTarget) this.matchProposals.delete(userId);
+        else proposedPeers.delete(specificTarget);
+    }
+
+    const peers = this.activeMatches.get(userId);
+    if (!peers) return;
+
+    // If specific target (skip match), only handle that one
+    const targets = specificTarget ? [specificTarget] : Array.from(peers);
+
+    targets.forEach(peerId => {
+        if (peers.has(peerId)) {
+            const peerPeers = this.activeMatches.get(peerId);
+
+            // P2P Logic: If peer has only 1 connection (us), it's a 1-on-1 call
+            if (peerPeers && peerPeers.size === 1 && peerPeers.has(userId)) {
+                // Force disconnect the peer (send them back to searching)
+                this.io.to(peerId).emit('force-disconnect');
+
+                // Cleanup
+                peerPeers.delete(userId);
+                this.activeMatches.delete(peerId);
+            } else {
+                // Group Logic: Just notify peer we left
+                this.io.to(peerId).emit('peer-left', { peerId: userId });
+                if (peerPeers) peerPeers.delete(userId);
+            }
+
+            peers.delete(peerId);
+        }
+    });
+
+    if (peers.size === 0) {
+        this.activeMatches.delete(userId);
+    }
+}
 
     private updateReputation(userId: string) {
-        const startTime = this.userStartTimes.get(userId);
-        if (startTime) {
-            const durationMinutes = (Date.now() - startTime) / 60000;
-            if (durationMinutes > 0.5) { // Only count if > 30 seconds
-                const currentRep = this.userReputations.get(userId) || 100;
-                // +10 points per minute
-                const points = Math.floor(durationMinutes * 10);
-                this.userReputations.set(userId, currentRep + points);
-            }
-            this.userStartTimes.delete(userId);
+    const startTime = this.userStartTimes.get(userId);
+    if (startTime) {
+        const durationMinutes = (Date.now() - startTime) / 60000;
+        if (durationMinutes > 0.5) { // Only count if > 30 seconds
+            const currentRep = this.userReputations.get(userId) || 100;
+            // +10 points per minute
+            const points = Math.floor(durationMinutes * 10);
+            this.userReputations.set(userId, currentRep + points);
         }
+        this.userStartTimes.delete(userId);
     }
+}
 }
