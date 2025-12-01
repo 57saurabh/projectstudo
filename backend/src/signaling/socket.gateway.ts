@@ -21,6 +21,7 @@ export class SocketGateway {
     private userReputations: Map<string, number> = new Map();
     private userNames: Map<string, string> = new Map(); // Track display names
     private socketToUserId: Map<string, string> = new Map(); // Map socketId -> userId (DB _id)
+    private userIdToSocket: Map<string, string> = new Map(); // Map userId -> socketId
     private activeMatches: Map<string, Set<string>> = new Map(); // Track active connections: userId -> Set<peerId>
     private pendingMatches: Map<string, Set<string>> = new Map(); // Track pending proposals: matchId (initiatorId) -> Set<userId> (accepted)
     private matchProposals: Map<string, Set<string>> = new Map(); // Track who is proposed to whom: userId -> Set<peerId>
@@ -51,6 +52,7 @@ export class SocketGateway {
 
             if (userId) {
                 this.socketToUserId.set(socket.id, userId);
+                this.userIdToSocket.set(userId, socket.id);
                 socket.join(userId); // Join room named after userId for direct messaging
             }
 
@@ -422,64 +424,67 @@ export class SocketGateway {
                                 conversationId: conversation._id
                             });
                         }
-                    });
-            console.log('Message saved to DB (Encrypted)');
-        } catch (err) {
-            console.error('Failed to save message:', err);
-        }
+                    }
+                }
+                    console.log('Message saved to DB (Encrypted)');
+            } catch (err) {
+                console.error('Failed to save message:', err);
+            }
+        });
+
+        // ...
+
+        // Handle Skip Match
+        socket.on('skip-match', async (data) => {
+            const { target } = data;
+            this.handleDisconnection(socket.id, target);
+
+            // Re-enter queue automatically
+            await this.matchmakingService.addToQueue(socket.id);
+
+            // Trigger find match logic again
+            const match = await this.matchmakingService.findMatch(socket.id);
+            if (match) {
+                // Create a proposal instead of active match
+                if (!this.matchProposals.has(socket.id)) this.matchProposals.set(socket.id, new Set());
+                if (!this.matchProposals.has(match)) this.matchProposals.set(match, new Set());
+
+                this.matchProposals.get(socket.id)!.add(match);
+                this.matchProposals.get(match)!.add(socket.id);
+
+                // Initialize pending acceptance set
+                const matchKey = [socket.id, match].sort().join(':');
+                this.pendingMatches.set(matchKey, new Set());
+
+                // Notify both users with profile info (PROPOSED)
+                this.io.to(socket.id).emit('match-proposed', {
+                    peerId: match,
+                    initiator: true,
+                    reputation: this.userReputations.get(match) || 100,
+                    avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${match}`
+                });
+                this.io.to(match).emit('match-proposed', {
+                    peerId: socket.id,
+                    initiator: false,
+                    reputation: this.userReputations.get(socket.id) || 100,
+                    avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${socket.id}`
+                });
+            }
+        });
+
+        socket.on('disconnect', () => {
+            console.log(`User disconnected: ${socket.id}`);
+            this.handleDisconnection(socket.id);
+            this.updateReputation(socket.id); // Update rep on disconnect
+            this.matchmakingService.removeFromQueue(socket.id);
+            this.userNames.delete(socket.id); // Cleanup name
+            const userId = this.socketToUserId.get(socket.id);
+            if (userId) this.userIdToSocket.delete(userId);
+            this.socketToUserId.delete(socket.id); // Cleanup userId mapping
+            this.io.emit('user-count', this.io.engine.clientsCount);
+        });
     });
-
-            // ...
-
-            // Handle Skip Match
-            socket.on('skip-match', async (data) => {
-    const { target } = data;
-    this.handleDisconnection(socket.id, target);
-
-    // Re-enter queue automatically
-    await this.matchmakingService.addToQueue(socket.id);
-
-    // Trigger find match logic again
-    const match = await this.matchmakingService.findMatch(socket.id);
-    if (match) {
-        // Create a proposal instead of active match
-        if (!this.matchProposals.has(socket.id)) this.matchProposals.set(socket.id, new Set());
-        if (!this.matchProposals.has(match)) this.matchProposals.set(match, new Set());
-
-        this.matchProposals.get(socket.id)!.add(match);
-        this.matchProposals.get(match)!.add(socket.id);
-
-        // Initialize pending acceptance set
-        const matchKey = [socket.id, match].sort().join(':');
-        this.pendingMatches.set(matchKey, new Set());
-
-        // Notify both users with profile info (PROPOSED)
-        this.io.to(socket.id).emit('match-proposed', {
-            peerId: match,
-            initiator: true,
-            reputation: this.userReputations.get(match) || 100,
-            avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${match}`
-        });
-        this.io.to(match).emit('match-proposed', {
-            peerId: socket.id,
-            initiator: false,
-            reputation: this.userReputations.get(socket.id) || 100,
-            avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${socket.id}`
-        });
-    }
-});
-
-socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.id}`);
-    this.handleDisconnection(socket.id);
-    this.updateReputation(socket.id); // Update rep on disconnect
-    this.matchmakingService.removeFromQueue(socket.id);
-    this.userNames.delete(socket.id); // Cleanup name
-    this.socketToUserId.delete(socket.id); // Cleanup userId mapping
-    this.io.emit('user-count', this.io.engine.clientsCount);
-});
-        });
-    }
+}
 
     private handleDisconnection(userId: string, specificTarget ?: string) {
     // Cleanup Pending Matches
