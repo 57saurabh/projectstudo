@@ -1,32 +1,36 @@
-import * as faceapi from '@vladmandic/face-api';
+// import * as faceapi from '@vladmandic/face-api';
 
 export class FaceDetectionService {
     private isLoaded = false;
-    private options: faceapi.TinyFaceDetectorOptions | null = null;
+    private options: any = null; // faceapi.TinyFaceDetectorOptions
+    private faceapi: any = null;
 
     async load() {
-        if (this.isLoaded) return;
+        if (this.isLoaded || typeof window === 'undefined') return;
+
+        // Dynamic import
+        this.faceapi = await import('@vladmandic/face-api');
 
         // Load models from CDN
         const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
 
         await Promise.all([
-            faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+            this.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
             // We can add faceLandmark68Net or faceRecognitionNet if needed later
-            // faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+            // this.faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
         ]);
 
-        this.options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+        this.options = new this.faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
         this.isLoaded = true;
         console.log('Face-api.js models loaded');
     }
 
     async detect(videoElement: HTMLVideoElement) {
-        if (!this.isLoaded || !this.options) return null;
+        if (!this.isLoaded || !this.options || !this.faceapi) return null;
 
         try {
             // Detect single face
-            const result = await faceapi.detectSingleFace(videoElement, this.options);
+            const result = await this.faceapi.detectSingleFace(videoElement, this.options);
             return result;
         } catch (error) {
             console.warn("Face detection error:", error);
@@ -36,3 +40,4 @@ export class FaceDetectionService {
 }
 
 export const faceDetectionService = new FaceDetectionService();
+

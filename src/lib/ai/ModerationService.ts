@@ -1,19 +1,24 @@
-import * as nsfwjs from 'nsfwjs';
-import * as tf from '@tensorflow/tfjs';
-
-// Enable TFJS backend (WebGL)
-tf.setBackend('webgl');
+// import * as nsfwjs from 'nsfwjs';
+// import * as tf from '@tensorflow/tfjs';
 
 export class ModerationService {
-    private model: nsfwjs.NSFWJS | null = null;
+    private model: any = null; // nsfwjs.NSFWJS
 
     async load() {
-        // Load the model from a public CDN or local path
-        // Using the default model hosted on GitHub Pages by the nsfwjs team
+        if (typeof window === 'undefined') return;
+
+        // Dynamic import to avoid server-side execution
+        const tf = await import('@tensorflow/tfjs');
+        const nsfwjs = await import('nsfwjs');
+
+        // Enable TFJS backend (WebGL)
+        tf.setBackend('webgl');
+
+        // Load the model
         this.model = await nsfwjs.load();
     }
 
-    async checkContent(videoElement: HTMLVideoElement): Promise<nsfwjs.PredictionType[] | null> {
+    async checkContent(videoElement: HTMLVideoElement): Promise<any[] | null> {
         if (!this.model) return null;
 
         // Classify the image
@@ -21,12 +26,12 @@ export class ModerationService {
         return predictions;
     }
 
-    isSafe(predictions: nsfwjs.PredictionType[]): { safe: boolean; reason?: string } {
+    isSafe(predictions: any[]): { safe: boolean; reason?: string } {
         // Categories: 'Drawing', 'Hentai', 'Neutral', 'Porn', 'Sexy'
 
-        const porn = predictions.find(p => p.className === 'Porn');
-        const hentai = predictions.find(p => p.className === 'Hentai');
-        const sexy = predictions.find(p => p.className === 'Sexy');
+        const porn = predictions.find((p: any) => p.className === 'Porn');
+        const hentai = predictions.find((p: any) => p.className === 'Hentai');
+        const sexy = predictions.find((p: any) => p.className === 'Sexy');
 
         // Thresholds
         // Strict on Porn/Hentai
@@ -42,3 +47,4 @@ export class ModerationService {
 }
 
 export const moderationService = new ModerationService();
+
