@@ -11,8 +11,8 @@ export class FaceDetectionService {
         // Dynamic import
         this.faceapi = await import('@vladmandic/face-api');
 
-        // Load models from CDN
-        const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
+        // Load models from local public folder
+        const MODEL_URL = '/models';
 
         await Promise.all([
             this.faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
