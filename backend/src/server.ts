@@ -28,6 +28,10 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
 
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 async function startServer() {
     try {
         // Connect to MongoDB

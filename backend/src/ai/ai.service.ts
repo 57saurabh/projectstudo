@@ -8,6 +8,9 @@ import path from 'path';
 const { Canvas: CanvasPolyfill, Image: ImagePolyfill, ImageData: ImageDataPolyfill } = require('canvas');
 faceapi.env.monkeyPatch({ Canvas: CanvasPolyfill, Image: ImagePolyfill, ImageData: ImageDataPolyfill });
 
+// Set TensorFlow backend to CPU to avoid GPU issues on Render
+tf.setBackend('cpu');
+
 export class AiService {
     private nsfwModel: nsfwjs.NSFWJS | null = null;
     private isFaceApiLoaded = false;
