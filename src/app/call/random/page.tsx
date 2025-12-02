@@ -9,7 +9,7 @@ import LocalVideo from '@/components/video/LocalVideo';
 import axios from 'axios';
 
 // AI Services
-import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
+import { remoteFaceDetectionService } from '@/lib/ai/RemoteFaceDetectionService';
 import { moderationService } from '@/lib/ai/ModerationService';
 
 // Components
@@ -46,18 +46,15 @@ export default function RandomChatPage() {
     const currentPeer = participants[0];
     const currentPeerId = currentPeer?.id;
 
-    // Load AI Models
+    // Load AI Models (NSFW only, Face is backend)
     useEffect(() => {
         const loadModels = async () => {
             try {
-                await Promise.all([
-                    faceDetectionService.load(),
-                    moderationService.load()
-                ]);
+                await moderationService.load();
                 isModelsLoaded.current = true;
-                console.log('AI Models loaded successfully');
+                console.log('NSFW Model loaded successfully');
             } catch (err) {
-                console.error('Failed to load AI models:', err);
+                console.error('Failed to load NSFW model:', err);
             }
         };
         loadModels();
@@ -76,9 +73,9 @@ export default function RandomChatPage() {
 
             const now = Date.now();
 
-            // 1. Face Detection
-            const faceResult = await faceDetectionService.detect(videoEl);
-            if (faceResult) {
+            // 1. Face Detection (Remote)
+            const faceResult = await remoteFaceDetectionService.detect(videoEl);
+            if (faceResult && faceResult.faceDetected) {
                 lastFaceDetectedTime.current = now;
                 setFaceWarning(null);
             } else {
@@ -91,7 +88,7 @@ export default function RandomChatPage() {
                 }
             }
 
-            // 2. NSFW Detection
+            // 2. NSFW Detection (Local CDN)
             const predictions = await moderationService.checkContent(videoEl);
             if (predictions) {
                 const safetyCheck = moderationService.isSafe(predictions);

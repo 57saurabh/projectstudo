@@ -10,7 +10,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import WebcamCapture from '@/components/profile/WebcamCapture';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
-import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
+import { remoteFaceDetectionService } from '@/lib/ai/RemoteFaceDetectionService';
 
 export default function PreCheckPage() {
     const router = useRouter();
@@ -88,7 +88,7 @@ export default function PreCheckPage() {
 
     useEffect(() => {
         let mounted = true;
-        let animationFrameId: number;
+        let timeoutId: NodeJS.Timeout;
 
         const scanFace = async () => {
             if (!localStream || !mounted || !videoRef.current) return;
@@ -96,12 +96,10 @@ export default function PreCheckPage() {
             const videoEl = videoRef.current;
 
             if (videoEl.readyState >= 2) {
-                // Ensure models are loaded
-                await faceDetectionService.load();
+                // Use Remote Face Detection Service
+                const result = await remoteFaceDetectionService.detect(videoEl);
 
-                const result = await faceDetectionService.detect(videoEl);
-
-                if (result) {
+                if (result && result.faceDetected) {
                     setFaceDetected(true);
                     setCheckStatus('success');
                     setStatusMessage('Face detected! You are ready.');
@@ -116,10 +114,8 @@ export default function PreCheckPage() {
                 }
             }
 
-            // Poll every 500ms
-            setTimeout(() => {
-                if (mounted) requestAnimationFrame(scanFace);
-            }, 500);
+            // Poll every 1 second
+            timeoutId = setTimeout(scanFace, 1000);
         };
 
         if (localStream) {
@@ -128,6 +124,7 @@ export default function PreCheckPage() {
 
         return () => {
             mounted = false;
+            clearTimeout(timeoutId);
         };
     }, [localStream]);
 
