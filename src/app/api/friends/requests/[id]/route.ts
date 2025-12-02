@@ -21,7 +21,8 @@ const getUserId = (req: Request) => {
 };
 
 // PUT: Accept or Reject request
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: Request, props: { params: Promise<{ id: string }> }) {
+    const params = await props.params;
     try {
         await dbConnect();
         const userId = getUserId(req);
