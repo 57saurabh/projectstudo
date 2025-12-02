@@ -7,15 +7,24 @@ export class ModerationService {
     async load() {
         if (typeof window === 'undefined') return;
 
-        // Dynamic import to avoid server-side execution
-        const tf = await import('@tensorflow/tfjs');
-        const nsfwjs = await import('nsfwjs');
+        // Wait for script to load if needed
+        const waitForNsfwJs = () => new Promise<void>((resolve) => {
+            if ((window as any).nsfwjs) return resolve();
+            const interval = setInterval(() => {
+                if ((window as any).nsfwjs) {
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, 100);
+        });
 
-        // Enable TFJS backend (WebGL)
-        tf.setBackend('webgl');
+        await waitForNsfwJs();
+        const nsfwjs = (window as any).nsfwjs;
 
         // Load the model
+        // Using default model from nsfwjs (hosted on GitHub)
         this.model = await nsfwjs.load();
+        console.log('NSFWJS Model loaded (CDN)');
     }
 
     async checkContent(videoElement: HTMLVideoElement): Promise<any[] | null> {
@@ -47,4 +56,5 @@ export class ModerationService {
 }
 
 export const moderationService = new ModerationService();
+
 

@@ -9,7 +9,8 @@ import LocalVideo from '@/components/video/LocalVideo';
 import axios from 'axios';
 
 // AI Services
-import { remoteAiService } from '@/lib/ai/RemoteAiService';
+import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
+import { moderationService } from '@/lib/ai/ModerationService';
 
 // Components
 import RandomChatHeader from '@/components/call/random/RandomChatHeader';
@@ -46,11 +47,23 @@ export default function RandomChatPage() {
     const currentPeerId = currentPeer?.id;
 
     // Load AI Models
-    // Models are loaded on backend, no need to load here
-    // useEffect(() => { ... }, []);
+    useEffect(() => {
+        const loadModels = async () => {
+            try {
+                await Promise.all([
+                    faceDetectionService.load(),
+                    moderationService.load()
+                ]);
+                isModelsLoaded.current = true;
+                console.log('AI Models loaded successfully');
+            } catch (err) {
+                console.error('Failed to load AI models:', err);
+            }
+        };
+        loadModels();
+    }, []);
 
     // Analysis Loop
-    // Analysis Loop (Remote)
     useEffect(() => {
         if (!localStream || !analysisVideoRef.current) return;
 
@@ -59,39 +72,39 @@ export default function RandomChatPage() {
         videoEl.play().catch(e => console.error('Analysis video play error:', e));
 
         const interval = setInterval(async () => {
-            if (videoEl.paused || videoEl.ended || videoEl.readyState < 2) return;
+            if (videoEl.paused || videoEl.ended || videoEl.readyState < 2 || !isModelsLoaded.current) return;
 
             const now = Date.now();
 
-            // Call Backend API
-            const result = await remoteAiService.analyze(videoEl);
-
-            if (result) {
-                // 1. Face Detection
-                if (result.faceDetected) {
-                    lastFaceDetectedTime.current = now;
-                    setFaceWarning(null);
-                } else {
-                    const timeSinceLastFace = now - lastFaceDetectedTime.current;
-                    if (timeSinceLastFace > 45000) { // 45 seconds
-                        abortCall();
-                        alert('Call aborted: Face not visible for too long.');
-                    } else if (timeSinceLastFace > 30000) { // 30 seconds
-                        setFaceWarning('Face not visible! Call will end soon.');
-                    }
-                }
-
-                // 2. NSFW Detection
-                if (!result.isSafe) {
-                    setNsfwWarning(result.unsafeReason || 'Inappropriate content detected');
+            // 1. Face Detection
+            const faceResult = await faceDetectionService.detect(videoEl);
+            if (faceResult) {
+                lastFaceDetectedTime.current = now;
+                setFaceWarning(null);
+            } else {
+                const timeSinceLastFace = now - lastFaceDetectedTime.current;
+                if (timeSinceLastFace > 45000) { // 45 seconds
                     abortCall();
-                    alert(`Call aborted: ${result.unsafeReason}`);
+                    alert('Call aborted: Face not visible for too long.');
+                } else if (timeSinceLastFace > 30000) { // 30 seconds
+                    setFaceWarning('Face not visible! Call will end soon.');
+                }
+            }
+
+            // 2. NSFW Detection
+            const predictions = await moderationService.checkContent(videoEl);
+            if (predictions) {
+                const safetyCheck = moderationService.isSafe(predictions);
+                if (!safetyCheck.safe) {
+                    setNsfwWarning(safetyCheck.reason || 'Inappropriate content detected');
+                    abortCall();
+                    alert(`Call aborted: ${safetyCheck.reason}`);
                 } else {
                     setNsfwWarning(null);
                 }
             }
 
-        }, 2000); // Check every 2 seconds to save bandwidth
+        }, 1000); // Check every second
 
         return () => {
             clearInterval(interval);

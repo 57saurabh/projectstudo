@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ReduxProvider } from "@/lib/store/ReduxProvider";
@@ -42,6 +43,9 @@ export default function RootLayout({
             </SignalingProvider>
           </ThemeProvider>
         </ReduxProvider>
+        <Script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js" strategy="lazyOnload" />
+        <Script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js" strategy="lazyOnload" />
+        <Script src="https://cdn.jsdelivr.net/npm/nsfwjs@latest/dist/nsfwjs.min.js" strategy="lazyOnload" />
       </body>
     </html>
   );
