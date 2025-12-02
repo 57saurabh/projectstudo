@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { LiveSessionModel as LiveSession } from '@backend/src/models/LiveSession';
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+    const params = await props.params;
     try {
         await dbConnect();
         const session = await LiveSession.findById(params.id).populate('host', 'displayName username avatarUrl');

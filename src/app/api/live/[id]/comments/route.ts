@@ -7,7 +7,8 @@ const MOCK_COMMENTS = [
     { id: '3', source: 'instagram', username: 'insta_fan', message: 'Love the stream ❤️', timestamp: new Date().toISOString() },
 ];
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+    const params = await props.params;
     // In a real app, this would fetch from DB + External APIs
     return NextResponse.json(MOCK_COMMENTS, { status: 200 });
 }
