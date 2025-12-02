@@ -1,33 +1,26 @@
-import { LiveSession } from '../models/LiveSession';
-import { LiveDestination } from '../models/LiveDestination';
+import { LiveSessionModel as LiveSession } from '../models/LiveSession';
 import { UserModel } from '../models/User';
 
 export class LiveService {
     async startSession(userId: string, data: any) {
         const { title, description, destinations } = data;
 
-        // Create Live Destinations
-        const destinationIds = [];
-        if (destinations && destinations.length > 0) {
-            for (const dest of destinations) {
-                const newDest = await LiveDestination.create({
-                    platform: dest.platform,
-                    rtmpUrl: dest.rtmpUrl, // In real app, fetch from connected account or user input
-                    streamKey: dest.streamKey,
-                    status: 'active'
-                });
-                destinationIds.push(newDest._id);
-            }
-        }
+        // Prepare destinations data for embedding
+        const destinationsData = destinations?.map((dest: any) => ({
+            platform: dest.platform,
+            rtmpUrl: dest.rtmpUrl,
+            streamKey: dest.streamKey,
+            status: 'active'
+        })) || [];
 
-        // Create Live Session
+        // Create Live Session with embedded destinations
         const session = await LiveSession.create({
             host: userId,
             title,
             description,
             type: 'broadcast', // Default for now
             status: 'live',
-            destinations: destinationIds,
+            destinations: destinationsData,
             startedAt: new Date()
         });
 
@@ -45,13 +38,15 @@ export class LiveService {
 
         session.status = 'ended';
         session.endedAt = new Date();
-        await session.save();
 
-        // Update destinations
-        await LiveDestination.updateMany(
-            { _id: { $in: session.destinations } },
-            { status: 'ended' }
-        );
+        // Update embedded destinations status
+        if (session.destinations && session.destinations.length > 0) {
+            session.destinations.forEach((dest: any) => {
+                dest.status = 'ended';
+            });
+        }
+
+        await session.save();
 
         // Update User status
         await UserModel.findByIdAndUpdate(userId, { isLive: false });

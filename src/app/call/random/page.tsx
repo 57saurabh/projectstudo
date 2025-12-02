@@ -77,8 +77,8 @@ export default function RandomChatPage() {
             const now = Date.now();
 
             // 1. Face Detection
-            const faceResult = faceDetectionService.detect(videoEl, now);
-            if (faceResult && faceResult.faceLandmarks.length > 0) {
+            const faceResult = await faceDetectionService.detect(videoEl);
+            if (faceResult) {
                 lastFaceDetectedTime.current = now;
                 setFaceWarning(null);
             } else {

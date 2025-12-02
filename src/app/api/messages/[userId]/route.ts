@@ -1,0 +1,76 @@
+import { NextResponse } from 'next/server';
+import dbConnect from '@/lib/db';
+import { ConversationModel } from '@backend/src/models/Conversation';
+import { UserModel } from '@/models/User';
+import { FriendRequestModel } from '@backend/src/models/FriendRequest';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
+
+export async function GET(req: Request, props: { params: Promise<{ userId: string }> }) {
+    const params = await props.params;
+    try {
+        await dbConnect();
+        const authHeader = req.headers.get('authorization');
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+
+        const token = authHeader.split(' ')[1];
+        let currentUserId: string;
+        try {
+            const decoded: any = jwt.verify(token, JWT_SECRET);
+            currentUserId = decoded.id;
+        } catch (err) {
+            return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
+        }
+
+        const targetUserId = params.userId;
+
+        const conversation = await ConversationModel.findOne({
+            "participants.userId": { $all: [currentUserId, targetUserId] }
+        });
+
+        let messages: any[] = [];
+        if (conversation) {
+            messages = conversation.messages;
+        }
+
+        // Check friendship status
+        const currentUser = await UserModel.findById(currentUserId);
+        const canSend = currentUser?.friends.includes(targetUserId) || false;
+
+        let requestStatus = 'none';
+        let requestId = undefined;
+
+        if (!canSend) {
+            const pendingRequest = await FriendRequestModel.findOne({
+                $or: [
+                    { sender: currentUserId, receiver: targetUserId },
+                    { sender: targetUserId, receiver: currentUserId }
+                ],
+                status: 'pending'
+            });
+
+            if (pendingRequest) {
+                if (pendingRequest.sender.toString() === currentUserId) {
+                    requestStatus = 'pending';
+                } else {
+                    requestStatus = 'received';
+                    requestId = pendingRequest._id;
+                }
+            }
+        }
+
+        return NextResponse.json({
+            messages,
+            canSend,
+            requestStatus,
+            requestId
+        });
+
+    } catch (error: any) {
+        console.error('Error fetching messages:', error);
+        return NextResponse.json({ message: 'Server error' }, { status: 500 });
+    }
+}

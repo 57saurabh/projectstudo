@@ -90,16 +90,15 @@ export default function PreCheckPage() {
         let mounted = true;
         let animationFrameId: number;
 
-        const scanFace = () => {
+        const scanFace = async () => {
             if (!localStream || !mounted || !videoRef.current) return;
 
             const videoEl = videoRef.current;
 
             if (videoEl.readyState >= 2) {
-                const now = Date.now();
-                const result = faceDetectionService.detect(videoEl, now);
+                const result = await faceDetectionService.detect(videoEl);
 
-                if (result && result.faceLandmarks.length > 0) {
+                if (result) {
                     setFaceDetected(true);
                     setCheckStatus('success');
                     setStatusMessage('Face detected! You are ready.');

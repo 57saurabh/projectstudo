@@ -29,13 +29,13 @@ export class ModerationService {
         const sexy = predictions.find(p => p.className === 'Sexy');
 
         // Thresholds
-        if (porn && porn.probability > 0.6) return { safe: false, reason: 'Nudity detected' };
-        if (hentai && hentai.probability > 0.6) return { safe: false, reason: 'Inappropriate content detected' };
+        // Strict on Porn/Hentai
+        if (porn && porn.probability > 0.5) return { safe: false, reason: 'Nudity detected' };
+        if (hentai && hentai.probability > 0.5) return { safe: false, reason: 'Inappropriate content detected' };
 
-        // "Sexy" might be shirtless or revealing, but not necessarily bannable immediately.
-        // However, user asked for "shirtless" detection. "Sexy" often covers this.
-        // Let's be strict for now or warn.
-        if (sexy && sexy.probability > 0.8) return { safe: false, reason: 'Inappropriate content detected' };
+        // "Sexy" usually catches shirtless/underwear. User asked for "shirtless" detection.
+        // We'll set a reasonable threshold.
+        if (sexy && sexy.probability > 0.7) return { safe: false, reason: 'Inappropriate attire detected' };
 
         return { safe: true };
     }

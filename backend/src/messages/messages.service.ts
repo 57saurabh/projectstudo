@@ -1,4 +1,4 @@
-import Conversation from '../models/Conversation';
+import { ConversationModel as Conversation } from '../models/Conversation';
 import { UserModel } from '../models/User';
 import { FriendRequestModel } from '../models/FriendRequest';
 
