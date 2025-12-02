@@ -10,7 +10,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import WebcamCapture from '@/components/profile/WebcamCapture';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
-import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
+import { remoteAiService } from '@/lib/ai/RemoteAiService';
 
 export default function PreCheckPage() {
     const router = useRouter();
@@ -88,7 +88,7 @@ export default function PreCheckPage() {
 
     useEffect(() => {
         let mounted = true;
-        let animationFrameId: number;
+        let timeoutId: NodeJS.Timeout;
 
         const scanFace = async () => {
             if (!localStream || !mounted || !videoRef.current) return;
@@ -96,9 +96,10 @@ export default function PreCheckPage() {
             const videoEl = videoRef.current;
 
             if (videoEl.readyState >= 2) {
-                const result = await faceDetectionService.detect(videoEl);
+                // Use Remote AI Service
+                const result = await remoteAiService.analyze(videoEl);
 
-                if (result) {
+                if (result && result.faceDetected) {
                     setFaceDetected(true);
                     setCheckStatus('success');
                     setStatusMessage('Face detected! You are ready.');
@@ -113,7 +114,8 @@ export default function PreCheckPage() {
                 }
             }
 
-            animationFrameId = requestAnimationFrame(scanFace);
+            // Poll every 1 second instead of requestAnimationFrame
+            timeoutId = setTimeout(scanFace, 1000);
         };
 
         if (localStream) {
@@ -122,7 +124,7 @@ export default function PreCheckPage() {
 
         return () => {
             mounted = false;
-            cancelAnimationFrame(animationFrameId);
+            clearTimeout(timeoutId);
         };
     }, [localStream]);
 

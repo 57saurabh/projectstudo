@@ -9,8 +9,7 @@ import LocalVideo from '@/components/video/LocalVideo';
 import axios from 'axios';
 
 // AI Services
-import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
-import { moderationService } from '@/lib/ai/ModerationService';
+import { remoteAiService } from '@/lib/ai/RemoteAiService';
 
 // Components
 import RandomChatHeader from '@/components/call/random/RandomChatHeader';
@@ -47,25 +46,13 @@ export default function RandomChatPage() {
     const currentPeerId = currentPeer?.id;
 
     // Load AI Models
-    useEffect(() => {
-        const loadModels = async () => {
-            try {
-                await Promise.all([
-                    faceDetectionService.load(),
-                    moderationService.load()
-                ]);
-                isModelsLoaded.current = true;
-                console.log('AI Models loaded successfully');
-            } catch (err) {
-                console.error('Failed to load AI models:', err);
-            }
-        };
-        loadModels();
-    }, []);
+    // Models are loaded on backend, no need to load here
+    // useEffect(() => { ... }, []);
 
     // Analysis Loop
+    // Analysis Loop (Remote)
     useEffect(() => {
-        if (!localStream || !analysisVideoRef.current || !isModelsLoaded.current) return;
+        if (!localStream || !analysisVideoRef.current) return;
 
         const videoEl = analysisVideoRef.current;
         videoEl.srcObject = localStream;
@@ -76,38 +63,35 @@ export default function RandomChatPage() {
 
             const now = Date.now();
 
-            // 1. Face Detection
-            const faceResult = await faceDetectionService.detect(videoEl);
-            if (faceResult) {
-                lastFaceDetectedTime.current = now;
-                setFaceWarning(null);
-            } else {
-                const timeSinceLastFace = now - lastFaceDetectedTime.current;
-                if (timeSinceLastFace > 45000) { // 45 seconds
+            // Call Backend API
+            const result = await remoteAiService.analyze(videoEl);
+
+            if (result) {
+                // 1. Face Detection
+                if (result.faceDetected) {
+                    lastFaceDetectedTime.current = now;
+                    setFaceWarning(null);
+                } else {
+                    const timeSinceLastFace = now - lastFaceDetectedTime.current;
+                    if (timeSinceLastFace > 45000) { // 45 seconds
+                        abortCall();
+                        alert('Call aborted: Face not visible for too long.');
+                    } else if (timeSinceLastFace > 30000) { // 30 seconds
+                        setFaceWarning('Face not visible! Call will end soon.');
+                    }
+                }
+
+                // 2. NSFW Detection
+                if (!result.isSafe) {
+                    setNsfwWarning(result.unsafeReason || 'Inappropriate content detected');
                     abortCall();
-                    alert('Call aborted: Face not visible for too long.');
-                } else if (timeSinceLastFace > 30000) { // 30 seconds
-                    setFaceWarning('Face not visible! Call will end soon.');
+                    alert(`Call aborted: ${result.unsafeReason}`);
+                } else {
+                    setNsfwWarning(null);
                 }
             }
 
-            // 2. NSFW Detection
-            const predictions = await moderationService.checkContent(videoEl);
-            if (predictions) {
-                const safetyCheck = moderationService.isSafe(predictions);
-                if (!safetyCheck.safe) {
-                    setNsfwWarning(safetyCheck.reason || 'Inappropriate content detected');
-                    // Give a short delay before aborting to let user see warning? 
-                    // Or abort immediately for safety. User requested "warning then abort" for face, 
-                    // but for NSFW usually it's strict. 
-                    // User prompt: "client side modrator (in js) for nude,shirtless"
-                    // Let's abort immediately for NSFW to be safe.
-                    abortCall();
-                    alert(`Call aborted: ${safetyCheck.reason}`);
-                }
-            }
-
-        }, 1000); // Check every second
+        }, 2000); // Check every 2 seconds to save bandwidth
 
         return () => {
             clearInterval(interval);

@@ -10,6 +10,7 @@ import { FriendController } from './friends/friends.controller';
 import { MessagesController } from './messages/messages.controller';
 import { LiveController } from './live/live.controller';
 import { UsersController } from './users/users.controller';
+import { AiController } from './ai/ai.controller';
 
 dotenv.config();
 
@@ -58,6 +59,10 @@ async function startServer() {
         // Initialize Users Module
         const usersController = new UsersController();
         app.use('/api/users', usersController.router);
+
+        // Initialize AI Module
+        const aiController = new AiController();
+        app.use('/api/ai', aiController.router);
 
         server.listen(PORT, () => {
             console.log(`🚀 Backend Server running on port ${PORT}`);
