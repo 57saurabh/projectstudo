@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MessageSquare, Search, Send, ArrowLeft, Clock, Check, CheckCheck } from 'lucide-react';
 import { useSelector } from 'react-redux';
-import { RootState } from '@/store/store';
+import { RootState } from '@/lib/store/store';
 import axios from 'axios';
 import { useSignaling } from '@/lib/webrtc/useSignaling';
 
