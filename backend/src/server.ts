@@ -7,6 +7,9 @@ import mongoose from 'mongoose';
 import { SocketGateway } from './signaling/socket.gateway';
 import { FriendService } from './friends/friends.service';
 import { FriendController } from './friends/friends.controller';
+import { MessagesController } from './messages/messages.controller';
+import { LiveController } from './live/live.controller';
+import { UsersController } from './users/users.controller';
 
 dotenv.config();
 
@@ -41,7 +44,20 @@ async function startServer() {
         // Initialize Friend Module
         const friendService = new FriendService(io);
         const friendController = new FriendController(friendService);
-        app.use('/friend-request', friendController.router);
+        app.use('/api/friends', friendController.router);
+        app.use('/friend-request', friendController.router); // Keep for legacy if needed
+
+        // Initialize Messages Module
+        const messagesController = new MessagesController();
+        app.use('/api/messages', messagesController.router);
+
+        // Initialize Live Module
+        const liveController = new LiveController();
+        app.use('/api/live', liveController.router);
+
+        // Initialize Users Module
+        const usersController = new UsersController();
+        app.use('/api/users', usersController.router);
 
         server.listen(PORT, () => {
             console.log(`🚀 Backend Server running on port ${PORT}`);
