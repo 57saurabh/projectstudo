@@ -1,10 +1,11 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+// Python Service URL (Localhost for now, update for production)
+const AI_SERVICE_URL = 'http://localhost:5001';
 
 export class RemoteAiService {
 
-    async analyze(videoElement: HTMLVideoElement): Promise<{ faceDetected: boolean; isSafe: boolean; unsafeReason?: string } | null> {
+    async analyze(videoElement: HTMLVideoElement): Promise<{ faceDetected: boolean; isSafe: boolean; unsafeScore?: number; reason?: string } | null> {
         try {
             // Capture frame from video
             const canvas = document.createElement('canvas');
@@ -14,10 +15,20 @@ export class RemoteAiService {
             if (!ctx) return null;
 
             ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-            const base64Image = canvas.toDataURL('image/jpeg', 0.7); // Compress to 0.7 quality
 
-            // Send to backend
-            const response = await axios.post(`${API_URL}/ai/analyze`, { image: base64Image });
+            // Convert to Blob for upload
+            const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.7));
+            if (!blob) return null;
+
+            const formData = new FormData();
+            formData.append('file', blob, 'frame.jpg');
+
+            // Send to Python Service
+            const response = await axios.post(`${AI_SERVICE_URL}/analyze`, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
             return response.data;
 
         } catch (error) {

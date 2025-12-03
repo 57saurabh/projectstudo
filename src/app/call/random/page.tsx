@@ -9,8 +9,7 @@ import LocalVideo from '@/components/video/LocalVideo';
 import axios from 'axios';
 
 // AI Services
-import { remoteFaceDetectionService } from '@/lib/ai/RemoteFaceDetectionService';
-import { moderationService } from '@/lib/ai/ModerationService';
+import { remoteAiService } from '@/lib/ai/RemoteAiService';
 
 // Components
 import RandomChatHeader from '@/components/call/random/RandomChatHeader';
@@ -46,19 +45,8 @@ export default function RandomChatPage() {
     const currentPeer = participants[0];
     const currentPeerId = currentPeer?.id;
 
-    // Load AI Models (NSFW only, Face is backend)
-    useEffect(() => {
-        const loadModels = async () => {
-            try {
-                await moderationService.load();
-                isModelsLoaded.current = true;
-                console.log('NSFW Model loaded successfully');
-            } catch (err) {
-                console.error('Failed to load NSFW model:', err);
-            }
-        };
-        loadModels();
-    }, []);
+    // Load AI Models (Not needed for remote)
+    // useEffect(() => { ... }, []);
 
     // Analysis Loop
     useEffect(() => {
@@ -69,33 +57,33 @@ export default function RandomChatPage() {
         videoEl.play().catch(e => console.error('Analysis video play error:', e));
 
         const interval = setInterval(async () => {
-            if (videoEl.paused || videoEl.ended || videoEl.readyState < 2 || !isModelsLoaded.current) return;
+            if (videoEl.paused || videoEl.ended || videoEl.readyState < 2) return;
 
             const now = Date.now();
 
-            // 1. Face Detection (Remote)
-            const faceResult = await remoteFaceDetectionService.detect(videoEl);
-            if (faceResult && faceResult.faceDetected) {
-                lastFaceDetectedTime.current = now;
-                setFaceWarning(null);
-            } else {
-                const timeSinceLastFace = now - lastFaceDetectedTime.current;
-                if (timeSinceLastFace > 45000) { // 45 seconds
-                    abortCall();
-                    alert('Call aborted: Face not visible for too long.');
-                } else if (timeSinceLastFace > 30000) { // 30 seconds
-                    setFaceWarning('Face not visible! Call will end soon.');
-                }
-            }
+            // Call Python AI Service
+            const result = await remoteAiService.analyze(videoEl);
 
-            // 2. NSFW Detection (Local CDN)
-            const predictions = await moderationService.checkContent(videoEl);
-            if (predictions) {
-                const safetyCheck = moderationService.isSafe(predictions);
-                if (!safetyCheck.safe) {
-                    setNsfwWarning(safetyCheck.reason || 'Inappropriate content detected');
+            if (result) {
+                // 1. Face Detection
+                if (result.faceDetected) {
+                    lastFaceDetectedTime.current = now;
+                    setFaceWarning(null);
+                } else {
+                    const timeSinceLastFace = now - lastFaceDetectedTime.current;
+                    if (timeSinceLastFace > 45000) { // 45 seconds
+                        abortCall();
+                        alert('Call aborted: Face not visible for too long.');
+                    } else if (timeSinceLastFace > 30000) { // 30 seconds
+                        setFaceWarning('Face not visible! Call will end soon.');
+                    }
+                }
+
+                // 2. NSFW Detection
+                if (!result.isSafe) {
+                    setNsfwWarning(result.reason || 'Inappropriate content detected');
                     abortCall();
-                    alert(`Call aborted: ${safetyCheck.reason}`);
+                    alert(`Call aborted: ${result.reason}`);
                 } else {
                     setNsfwWarning(null);
                 }

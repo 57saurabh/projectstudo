@@ -10,7 +10,7 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import WebcamCapture from '@/components/profile/WebcamCapture';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
-import { remoteFaceDetectionService } from '@/lib/ai/RemoteFaceDetectionService';
+import { remoteAiService } from '@/lib/ai/RemoteAiService';
 
 export default function PreCheckPage() {
     const router = useRouter();
@@ -96,8 +96,8 @@ export default function PreCheckPage() {
             const videoEl = videoRef.current;
 
             if (videoEl.readyState >= 2) {
-                // Use Remote Face Detection Service
-                const result = await remoteFaceDetectionService.detect(videoEl);
+                // Use Remote AI Service
+                const result = await remoteAiService.analyze(videoEl);
 
                 if (result && result.faceDetected) {
                     setFaceDetected(true);
