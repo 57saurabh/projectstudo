@@ -29,7 +29,7 @@ if not exist venv (
 call venv\Scripts\activate.bat
 
 :: Check if requirements installed (simple check)
-pip freeze | findstr "fastapi" >nul
+pip freeze | findstr "transformers" >nul
 if %errorlevel% neq 0 (
     echo Installing Python dependencies...
     pip install -r requirements.txt

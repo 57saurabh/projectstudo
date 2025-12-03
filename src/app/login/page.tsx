@@ -85,6 +85,7 @@ export default function AuthPage() {
                             <input
                                 type="email"
                                 required
+                                autoComplete="email"
                                 className="w-full bg-black/30 border-none rounded-lg p-4 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#8B5CF6] transition-all"
                                 placeholder="Enter your email"
                                 value={formData.email}
@@ -98,6 +99,7 @@ export default function AuthPage() {
                                 <input
                                     type={showPassword ? "text" : "password"}
                                     required
+                                    autoComplete="current-password"
                                     className="w-full bg-black/30 border-none rounded-lg p-4 pr-12 text-white placeholder-gray-500 focus:ring-2 focus:ring-[#8B5CF6] transition-all"
                                     placeholder="Enter your password"
                                     value={formData.password}
