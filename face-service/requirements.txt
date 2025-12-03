@@ -4,5 +4,5 @@ python-multipart
 numpy
 opencv-python-headless
 gunicorn
-nudenet==3.2.0
+nudenet>=3.2.0
 onnxruntime==1.15.1
