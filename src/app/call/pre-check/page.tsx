@@ -11,6 +11,7 @@ import { RootState } from '@/lib/store/store';
 import WebcamCapture from '@/components/profile/WebcamCapture';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
 import { remoteAiService } from '@/lib/ai/RemoteAiService';
+import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
 
 export default function PreCheckPage() {
     const router = useRouter();
