@@ -106,7 +106,7 @@ export class MatchmakingService {
     // -----------------------------------------------------------
     // REMOVE USER FROM ROOM + AUTO DELETE ROOM IF EMPTY
     // -----------------------------------------------------------
-    removeUser(socketId: string) {
+    removeUser(socketId: string): { roomId: string, remaining: string[] } | null {
         this.removeFromQueue(socketId);
 
         for (const [roomId, room] of this.rooms) {
@@ -115,14 +115,21 @@ export class MatchmakingService {
 
                 console.log(`[Matchmaking] User ${socketId} REMOVED from Room ${roomId}`);
 
+                // Return details BEFORE deleting if empty, so caller knows what happened
+                const result = {
+                    roomId,
+                    remaining: [...room.participants]
+                };
+
                 if (room.participants.length === 0) {
                     this.rooms.delete(roomId);
                     console.log(`[Matchmaking] Room ${roomId} DELETED (empty)`);
                 }
 
-                return;
+                return result;
             }
         }
+        return null;
     }
 
     // -----------------------------------------------------------

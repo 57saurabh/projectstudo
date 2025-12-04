@@ -153,14 +153,26 @@ export default function RandomChatPage() {
             socket.on('user-count', (count: number) => {
                 setUserCount(count);
             });
+
+            socket.on('call-ended', (data: { reason: string }) => {
+                console.log('Call ended:', data.reason);
+                // Alert user (optional, maybe a toast is better but alert is quick for now)
+                // alert(`Call ended: ${data.reason}`); 
+                // Actually, let's just show a quick status or just restart search
+
+                // Reset state and search again
+                abortCall();
+                findMatch();
+            });
         }
 
         return () => {
             socket?.off('user-count');
+            socket?.off('call-ended');
             // Abort call and reset state on unmount (route change)
             abortCall();
         };
-    }, [socket, abortCall]);
+    }, [socket, abortCall, findMatch]);
 
     // Friend Request Timer (3 minutes)
     // Auto-Friend Timer (90 seconds)

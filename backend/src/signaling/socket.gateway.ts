@@ -222,19 +222,37 @@ export class SocketGateway {
     }
 
     private handleLeaveRoom(socket: Socket, roomId: string) {
-        this.roomService.leaveRoom(socket.id);
         socket.leave(roomId);
+        const result = this.matchmakingService.removeUser(socket.id);
 
-        // Notify others in room
-        socket.to(roomId).emit('user-left', { socketId: socket.id });
+        if (result) {
+            const { remaining } = result;
+            if (remaining.length === 1) {
+                // Only 1 person left -> Dead room -> End call for them
+                const lastUserId = remaining[0];
+                console.log(`[Gateway] Room ${roomId} has only 1 user left (${lastUserId}). Ending call.`);
+
+                this.io.to(lastUserId).emit('call-ended', { reason: 'Partner disconnected' });
+
+                // Also remove them from the room effectively dissolving it
+                this.matchmakingService.removeUser(lastUserId);
+                const lastSocket = this.io.sockets.sockets.get(lastUserId);
+                lastSocket?.leave(roomId);
+            } else if (remaining.length > 1) {
+                // Group still active -> Notify others
+                socket.to(roomId).emit('user-left', { socketId: socket.id });
+            }
+        }
     }
 
     private handleDisconnection(socket: Socket) {
-        this.matchmakingService.removeUser(socket.id);
-
         const roomId = this.roomService.getRoomId(socket.id);
         if (roomId) {
+            // handleLeaveRoom now handles the removal logic
             this.handleLeaveRoom(socket, roomId);
+        } else {
+            // Just remove from queue if not in room
+            this.matchmakingService.removeUser(socket.id);
         }
 
         this.userNames.delete(socket.id);
