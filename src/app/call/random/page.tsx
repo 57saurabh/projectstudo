@@ -7,6 +7,7 @@ import { useCallStore } from '@/lib/store/useCallStore';
 import { useRouter } from 'next/navigation';
 import LocalVideo from '@/components/video/LocalVideo';
 import axios from 'axios';
+import { toast } from 'sonner';
 
 // AI Services
 import { remoteAiService } from '@/lib/ai/RemoteAiService';
@@ -55,9 +56,11 @@ export default function RandomChatPage() {
         videoEl.srcObject = localStream;
         if (videoEl.paused) {
             videoEl.play().catch(e => {
-                if (e.name !== 'AbortError') {
-                    console.error('Analysis video play error:', e);
+                // Ignore AbortError and "interrupted" errors common with rapid stream updates
+                if (e.name === 'AbortError' || e.message?.includes('interrupted')) {
+                    return;
                 }
+                console.error('Analysis video play error:', e);
             });
         }
 
@@ -78,7 +81,7 @@ export default function RandomChatPage() {
                     const timeSinceLastFace = now - lastFaceDetectedTime.current;
                     if (timeSinceLastFace > 45000) { // 45 seconds
                         abortCall();
-                        alert('Call aborted: Face not visible for too long.');
+                        toast.error('Call aborted: Face not visible for too long.');
                     } else if (timeSinceLastFace > 30000) { // 30 seconds
                         setFaceWarning('Face not visible! Call will end soon.');
                     }
@@ -88,7 +91,7 @@ export default function RandomChatPage() {
                 if (!result.isSafe) {
                     setNsfwWarning(result.reason || 'Inappropriate content detected');
                     abortCall();
-                    alert(`Call aborted: ${result.reason}`);
+                    toast.error(`Call aborted: ${result.reason}`);
                 } else {
                     setNsfwWarning(null);
                 }
@@ -222,21 +225,22 @@ export default function RandomChatPage() {
             await axios.post('/api/friends/send', { receiverId: currentPeer.userId }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            alert('You have been connected for 90s! Friend request sent automatically.');
+            toast.success('You have been connected for 90s! Friend request sent automatically.');
         } catch (error) {
             console.error('Failed to auto-add friend:', error);
+            toast.error('Failed to send auto-friend request');
         }
     };
 
     const handleAddRandomUser = () => {
         addRandomUser();
-        alert('Searching for another user to add...');
+        toast.info('Searching for another user to add...');
     };
 
     const handleInviteUser = (targetId: string) => {
         inviteUser(targetId);
         setShowInviteModal(false);
-        alert(`Invite sent to ${targetId}`);
+        toast.success(`Invite sent to ${targetId}`);
     };
 
     return (

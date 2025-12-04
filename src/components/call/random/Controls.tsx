@@ -61,10 +61,14 @@ export default function Controls({
                 </button>
                 <button
                     onClick={onAddRandomUser}
-                    className="p-2 md:p-3 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-colors"
-                    title="Add Random User"
+                    className="group relative p-2 md:p-3 rounded-lg text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg hover:shadow-purple-500/25 mx-1"
+                    title="Add (+1) Person to Call"
                 >
                     <UserPlus size={20} className="md:w-6 md:h-6" />
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-purple-500"></span>
+                    </span>
                 </button>
                 <button
                     onClick={onSkip}

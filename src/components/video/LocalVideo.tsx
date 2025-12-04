@@ -14,8 +14,8 @@ export default function LocalVideo() {
         if (videoEl && localStream) {
             videoEl.srcObject = localStream;
             videoEl.play().catch(e => {
-                if (e.name === 'AbortError') {
-                    console.log('Local video play aborted (harmless)');
+                if (e.name === 'AbortError' || e.message?.includes('interrupted')) {
+                    // Silently ignore
                 } else {
                     console.error('Local video play error:', e);
                 }

@@ -11,6 +11,7 @@ import AuthGuard from "@/components/auth/AuthGuard";
 import AppLayout from "@/components/layout/AppLayout";
 import { CameraGuard } from '@/components/utils/CameraGuard';
 import AuthInitializer from "@/components/auth/AuthInitializer";
+import { Toaster } from 'sonner';
 
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 
