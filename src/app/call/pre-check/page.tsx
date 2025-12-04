@@ -10,7 +10,6 @@ import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import WebcamCapture from '@/components/profile/WebcamCapture';
 import { COUNTRIES, LANGUAGES } from '@/lib/constants';
-import { remoteAiService } from '@/lib/ai/RemoteAiService';
 import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
 
 export default function PreCheckPage() {
@@ -97,10 +96,12 @@ export default function PreCheckPage() {
             const videoEl = videoRef.current;
 
             if (videoEl.readyState >= 2) {
-                // Use Remote AI Service
-                const result = await remoteAiService.analyze(videoEl);
+                // Use Client-Side Face Detection (face-api.js)
+                const result = await faceDetectionService.detect(videoEl);
 
-                if (result && result.faceDetected) {
+                // Note: face-api.js returns a detection object if found, or undefined/null if not.
+                // It doesn't return { faceDetected: boolean } like the remote service.
+                if (result) {
                     setFaceDetected(true);
                     setCheckStatus('success');
                     setStatusMessage('Face detected! You are ready.');
