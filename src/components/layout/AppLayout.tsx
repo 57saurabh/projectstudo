@@ -18,7 +18,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                     }`}
             >
                 {!isAuthPage && <Header />}
-                <div className="flex-1 p-4">
+                <div className="flex-1 p-2 lg:p-4">
                     {children}
                 </div>
             </main>

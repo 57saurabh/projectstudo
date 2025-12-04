@@ -8,6 +8,7 @@ interface AuthState {
     user: User | null;
     token: string | null;
     isAuthenticated: boolean;
+    isInitialized: boolean;
     loading: boolean;
     error: string | null;
 }
@@ -16,6 +17,7 @@ const initialState: AuthState = {
     user: null,
     token: null,
     isAuthenticated: false,
+    isInitialized: false,
     loading: false,
     error: null,
 };
@@ -84,15 +86,20 @@ const authSlice = createSlice({
             state.user = null;
             state.token = null;
             state.isAuthenticated = false;
+            state.isInitialized = true; // Still initialized, just logged out
             localStorage.removeItem('token');
         },
         loadUser: (state, action: PayloadAction<{ user: User; token: string }>) => {
             state.user = action.payload.user;
             state.token = action.payload.token;
             state.isAuthenticated = true;
+            state.isInitialized = true;
         },
         setUser: (state, action: PayloadAction<User>) => {
             state.user = action.payload;
+        },
+        setInitialized: (state, action: PayloadAction<boolean>) => {
+            state.isInitialized = action.payload;
         }
     },
     extraReducers: (builder) => {
@@ -104,12 +111,14 @@ const authSlice = createSlice({
             .addCase(login.fulfilled, (state, action) => {
                 state.loading = false;
                 state.isAuthenticated = true;
+                state.isInitialized = true;
                 state.user = action.payload.user;
                 state.token = action.payload.token;
             })
             .addCase(login.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
+                state.isInitialized = true;
             })
             .addCase(signup.pending, (state) => {
                 state.loading = true;
@@ -118,12 +127,14 @@ const authSlice = createSlice({
             .addCase(signup.fulfilled, (state, action) => {
                 state.loading = false;
                 state.isAuthenticated = true;
+                state.isInitialized = true;
                 state.user = action.payload.user;
                 state.token = action.payload.token;
             })
             .addCase(signup.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload as string;
+                state.isInitialized = true;
             })
             .addCase(fetchCurrentUser.fulfilled, (state, action) => {
                 state.user = { ...state.user, ...action.payload };
@@ -134,17 +145,19 @@ const authSlice = createSlice({
             .addCase(verifyToken.fulfilled, (state, action) => {
                 state.loading = false;
                 state.isAuthenticated = true;
+                state.isInitialized = true;
                 state.user = action.payload.user;
                 state.token = action.payload.token;
             })
             .addCase(verifyToken.rejected, (state) => {
                 state.loading = false;
                 state.isAuthenticated = false;
+                state.isInitialized = true;
                 state.user = null;
                 state.token = null;
             });
     },
 });
 
-export const { logout, loadUser, setUser } = authSlice.actions;
+export const { logout, loadUser, setUser, setInitialized } = authSlice.actions;
 export default authSlice.reducer;

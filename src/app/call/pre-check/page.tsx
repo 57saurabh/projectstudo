@@ -132,6 +132,7 @@ export default function PreCheckPage() {
 
     const handleStartMatching = () => {
         if (faceDetected) {
+            sessionStorage.setItem('preCheckPassed', 'true');
             router.push('/call/random');
         }
     };
@@ -167,7 +168,7 @@ export default function PreCheckPage() {
     if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#191121] text-white">Loading...</div>;
 
     return (
-        <div className="flex min-h-screen w-full flex-col lg:flex-row items-center justify-center bg-[#191121] p-6 gap-8">
+        <div className="flex min-h-screen w-full flex-col lg:flex-row items-center justify-center bg-[#191121] p-4 lg:p-6 gap-6 lg:gap-8">
             {/* Hidden Video and Canvas for Capture */}
             <video ref={videoRef} autoPlay muted playsInline className="hidden" />
             <canvas ref={canvasRef} className="hidden" />

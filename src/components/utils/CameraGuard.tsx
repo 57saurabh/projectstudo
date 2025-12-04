@@ -6,7 +6,8 @@ import { useCallStore } from '@/lib/store/useCallStore';
 
 export const CameraGuard = () => {
     const pathname = usePathname();
-    const { localStream, setLocalStream } = useCallStore();
+    const localStream = useCallStore(state => state.localStream);
+    const setLocalStream = useCallStore(state => state.setLocalStream);
 
     useEffect(() => {
         // List of paths where camera is allowed

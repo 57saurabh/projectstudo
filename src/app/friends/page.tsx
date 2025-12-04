@@ -110,7 +110,7 @@ export default function FriendsPage() {
     });
 
     return (
-        <div className="flex-1 flex flex-col h-screen bg-background text-text-primary overflow-hidden p-6 lg:p-10 transition-colors duration-300">
+        <div className="flex-1 flex flex-col h-screen bg-background text-text-primary overflow-hidden p-4 lg:p-10 transition-colors duration-300">
             <div className="max-w-5xl w-full mx-auto flex flex-col h-full gap-6">
 
                 {/* Header */}

@@ -49,7 +49,7 @@ export default function RemoteVideo({ stream, isMuted, isVideoOff, avatarUrl, di
                             <img src={avatarUrl} alt={displayName} className="w-full h-full object-cover" />
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-white/50">
-                                {displayName[0]}
+                                {displayName?.[0] || '?'}
                             </div>
                         )}
                     </div>

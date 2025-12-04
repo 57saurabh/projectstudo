@@ -16,7 +16,6 @@ import RandomChatHeader from '@/components/call/random/RandomChatHeader';
 import IncomingInvite from '@/components/call/random/IncomingInvite';
 import InviteUserModal from '@/components/call/random/InviteUserModal';
 import MatchOverlay from '@/components/call/random/MatchOverlay';
-import ConnectingOverlay from '@/components/call/random/ConnectingOverlay';
 import VideoGrid from '@/components/call/random/VideoGrid';
 import Controls from '@/components/call/random/Controls';
 import ChatArea from '@/components/call/random/ChatArea';
@@ -54,7 +53,13 @@ export default function RandomChatPage() {
 
         const videoEl = analysisVideoRef.current;
         videoEl.srcObject = localStream;
-        videoEl.play().catch(e => console.error('Analysis video play error:', e));
+        if (videoEl.paused) {
+            videoEl.play().catch(e => {
+                if (e.name !== 'AbortError') {
+                    console.error('Analysis video play error:', e);
+                }
+            });
+        }
 
         const interval = setInterval(async () => {
             if (videoEl.paused || videoEl.ended || videoEl.readyState < 2) return;
@@ -123,6 +128,13 @@ export default function RandomChatPage() {
     const router = useRouter();
 
     useEffect(() => {
+        // Enforce Pre-Check
+        const hasPassedPreCheck = sessionStorage.getItem('preCheckPassed');
+        if (!hasPassedPreCheck) {
+            router.push('/call/pre-check');
+            return;
+        }
+
         if (user && !user.avatarUrl) {
             // Redirect to profile page if no avatar
             router.push('/settings/profile');
@@ -195,7 +207,7 @@ export default function RandomChatPage() {
             // If both sides send it (which they will due to the timer), the backend should handle it as "Accept" if logic permits,
             // or we rely on the user to accept the incoming request.
             // For now, we'll send the request.
-            await axios.post('/api/friends', { receiverId: currentPeer.userId }, {
+            await axios.post('/api/friends/send', { receiverId: currentPeer.userId }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             alert('You have been connected for 90s! Friend request sent automatically.');
@@ -235,7 +247,7 @@ export default function RandomChatPage() {
             />
 
             {/* Main Content */}
-            <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 lg:p-6 overflow-hidden">
+            <main className="flex-1 flex flex-col lg:flex-row gap-4 p-2 lg:p-6 overflow-y-auto lg:overflow-hidden">
 
                 {/* Video Area */}
                 <div className="flex-1 relative flex flex-col justify-end items-center bg-black/50 rounded-xl overflow-hidden border border-white/10">
@@ -248,11 +260,6 @@ export default function RandomChatPage() {
                         onAccept={acceptMatch}
                         onSkip={handleSkipPending}
                         setHasAccepted={setHasAccepted}
-                    />
-
-                    <ConnectingOverlay
-                        callState={callState}
-                        currentPeer={currentPeer}
                         onAbort={abortCall}
                         onRetry={findMatch}
                     />

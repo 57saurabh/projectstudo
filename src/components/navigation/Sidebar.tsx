@@ -40,7 +40,7 @@ export default function Sidebar() {
         { name: 'Friends', href: '/friends', icon: Users },
         { name: 'Groups', href: '/groups', icon: Video },
         { name: 'Messages', href: '/messages', icon: MessageSquare },
-        { name: 'Settings', href: '/settings', icon: Settings },
+
     ];
 
     return (
@@ -183,29 +183,13 @@ export default function Sidebar() {
                     })}
                 </nav>
 
-                {/* Footer */}
+                {/* Footer - Removed Logout (Moved to Header) */}
                 <div className="p-4 mt-auto">
-                    <motion.button
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleLogout}
-                        className={`flex items-center w-full rounded-2xl text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors group relative overflow-hidden ${isOpen ? 'px-4 py-3.5' : 'justify-center py-3.5'
-                            }`}
-                    >
-                        <LogOut size={24} className="flex-shrink-0 relative z-10" />
-                        <AnimatePresence>
-                            {isOpen && (
-                                <motion.span
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -10 }}
-                                    className="ml-3 font-medium whitespace-nowrap relative z-10"
-                                >
-                                    Logout
-                                </motion.span>
-                            )}
-                        </AnimatePresence>
-                    </motion.button>
+                    {/* Placeholder or empty if needed, or just remove the div entirely. 
+                        Keeping the div with mt-auto ensures the nav stays at top. 
+                        Actually, nav has flex-1, so it pushes footer down. 
+                        If I remove footer content, I can remove the div.
+                    */}
                 </div>
             </motion.aside>
 

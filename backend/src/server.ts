@@ -1,21 +1,22 @@
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load environment variables immediately
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config();
+
 import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import mongoose from 'mongoose';
-import path from 'path';
 import { SocketGateway } from './signaling/socket.gateway';
 import { FriendService } from './friends/friends.service';
 import { FriendController } from './friends/friends.controller';
 import { MessagesController } from './messages/messages.controller';
 import { LiveController } from './live/live.controller';
 import { UsersController } from './users/users.controller';
-
-// Load environment variables
-// Try loading .env.local first (Next.js convention)
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-dotenv.config(); // Fallback to .env
+import { AuthController } from './auth/auth.controller';
 
 const app = express();
 const server = http.createServer(app);
@@ -48,6 +49,10 @@ async function startServer() {
 
         // Initialize WebSocket Gateway
         new SocketGateway(io);
+
+        // Initialize Auth Module
+        const authController = new AuthController();
+        app.use('/api/auth', authController.router);
 
         // Initialize Friend Module
         const friendService = new FriendService(io);

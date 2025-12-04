@@ -42,7 +42,7 @@ export default function AuthPage() {
             {/* Background Glow */}
             <div className="absolute inset-0 bg-[radial-gradient(circle_800px_at_100%_200px,#8b5cf633,transparent)] pointer-events-none" />
 
-            <div className="relative z-10 w-full max-w-md flex flex-col items-center">
+            <div className="relative z-10 w-full max-w-md flex flex-col items-center px-4 sm:px-0">
                 {/* Logo */}
                 <div className="mb-8 flex items-center gap-3">
                     <div className="w-10 h-10 bg-[#8B5CF6] rounded-full flex items-center justify-center text-white font-bold text-xl">Z</div>
@@ -50,7 +50,7 @@ export default function AuthPage() {
                 </div>
 
                 {/* Card */}
-                <div className="w-full bg-[#1A181D] border border-white/10 rounded-xl p-8 shadow-2xl shadow-[#8B5CF6]/10 backdrop-blur-md">
+                <div className="w-full bg-[#1A181D] border border-white/10 rounded-xl p-6 sm:p-8 shadow-2xl shadow-[#8B5CF6]/10 backdrop-blur-md">
 
                     {/* Toggle */}
                     <div className="flex bg-black/30 p-1 rounded-lg mb-8">
