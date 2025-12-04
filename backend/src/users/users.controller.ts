@@ -2,7 +2,7 @@ import express from 'express';
 import { UsersService } from './users.service';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
 
 export class UsersController {
     public router = express.Router();

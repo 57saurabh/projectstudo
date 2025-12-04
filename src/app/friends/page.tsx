@@ -28,6 +28,7 @@ export default function FriendsPage() {
     const { token, user } = useSelector((state: RootState) => state.auth);
     const router = useRouter();
 
+    console.log(token);
     useEffect(() => {
         if (token) {
             fetchFriends();

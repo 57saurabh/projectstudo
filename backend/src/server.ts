@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
+import path from 'path';
 import { SocketGateway } from './signaling/socket.gateway';
 import { FriendService } from './friends/friends.service';
 import { FriendController } from './friends/friends.controller';
@@ -11,7 +12,10 @@ import { MessagesController } from './messages/messages.controller';
 import { LiveController } from './live/live.controller';
 import { UsersController } from './users/users.controller';
 
-dotenv.config();
+// Load environment variables
+// Try loading .env.local first (Next.js convention)
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+dotenv.config(); // Fallback to .env
 
 const app = express();
 const server = http.createServer(app);

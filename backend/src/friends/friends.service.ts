@@ -88,4 +88,17 @@ export class FriendService {
         const user = await UserModel.findById(userA);
         return user?.friends.some((id: any) => id.toString() === userB) || false;
     }
+
+    async getFriends(userId: string) {
+        const user = await UserModel.findById(userId).populate('friends', 'displayName username avatarUrl status');
+        if (!user) throw new Error('User not found');
+        return user.friends;
+    }
+
+    async getPendingRequests(userId: string) {
+        return await FriendRequestModel.find({
+            receiver: userId,
+            status: 'pending'
+        }).populate('sender', 'displayName username avatarUrl');
+    }
 }
