@@ -173,22 +173,14 @@ export const useWebRTC = () => {
 
         // USER JOINED (Existing room, new guy enters)
         socket.on('user-joined', async (data) => {
-            const { socketId } = data;
-            console.log(`User joined room: ${socketId}`);
-
-            // Add placeholder participant
-            useCallStore.getState().addParticipant({
-                id: socketId,
-                name: 'New User', // We might need to fetch profile or send it in user-joined
-                isMuted: false,
-                isVideoOff: false
-            });
+            const { peerId } = data;
+            console.log(`User joined room: ${peerId}`);
 
             // Existing participants initiate to the new guy (Mesh convention for this app)
-            const pc = createPeerConnection(socketId);
+            const pc = createPeerConnection(peerId);
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-            socket.emit('offer', { target: socketId, sdp: offer });
+            socket.emit('offer', { target: peerId, sdp: offer });
         });
 
         socket.on('offer', async (data) => {

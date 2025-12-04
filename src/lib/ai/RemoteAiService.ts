@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Python Service URL (Localhost for now, update for production)
-const AI_SERVICE_URL = 'http://localhost:5001';
+const AI_SERVICE_URL = process.env.NEXT_PUBLIC_FACE_SERVICE_URL || 'http://localhost:5001';
 
 export class RemoteAiService {
 

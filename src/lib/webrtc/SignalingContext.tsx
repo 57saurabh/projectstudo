@@ -198,7 +198,7 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
                 isVideoOff: false,
                 reputation: data.reputation,
                 avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.peerId}`,
-                shouldOffer: false
+                shouldOffer: true
             });
             addMessage({
                 senderId: 'system',
@@ -222,7 +222,7 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
                     isVideoOff: false,
                     reputation: peer.reputation,
                     avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${peer.id}`,
-                    shouldOffer: true
+                    shouldOffer: false
                 });
             });
         });

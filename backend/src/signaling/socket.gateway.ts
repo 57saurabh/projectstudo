@@ -121,24 +121,57 @@ export class SocketGateway {
                     this.roomService.joinRoom(roomId, newPeerId);
                     this.io.sockets.sockets.get(newPeerId)?.join(roomId);
 
-                    // Notify new peer they joined a room
-                    // They need to know who is already there to initiate connections
-                    this.io.to(newPeerId).emit('match-found', {
+                    // Fetch details for ALL existing participants to send to the new guy
+                    const existingPeersDetails = [];
+                    for (const participantId of currentParticipants) {
+                        const pUserId = this.socketToUserId.get(participantId);
+                        let pUser = null;
+                        if (pUserId) {
+                            try {
+                                pUser = await UserModel.findById(pUserId).select('username bio country language');
+                            } catch (e) { }
+                        }
+                        existingPeersDetails.push({
+                            id: participantId,
+                            displayName: this.userNames.get(participantId) || 'Stranger',
+                            reputation: this.userReputations.get(participantId) || 100,
+                            avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${participantId}`,
+                            username: pUser?.username || 'Stranger',
+                            bio: pUser?.bio || '',
+                            country: pUser?.country || '',
+                            language: pUser?.language || ''
+                        });
+                    }
+
+                    // Notify new peer they joined a room and give them the list of peers
+                    this.io.to(newPeerId).emit('join-success', {
                         roomId,
-                        initiator: false, // They are joining, so they wait for offers? Or mesh logic?
-                        // In mesh, usually new joiner initiates to existing, or existing initiate to new.
-                        // Let's stick to: New joiner waits for offers from existing participants?
-                        // Or better: Existing participants see 'user-joined' and initiate offer to new guy.
-                        isPlusOne: true
+                        peers: existingPeersDetails
                     });
 
-                    // Notify existing participants
-                    socket.to(roomId).emit('user-joined', { socketId: newPeerId });
+                    // Notify existing participants about the new guy
+                    // We need to fetch new guy's details first
+                    const newPeerUserId = this.socketToUserId.get(newPeerId);
+                    let newPeerUser = null;
+                    if (newPeerUserId) {
+                        try {
+                            newPeerUser = await UserModel.findById(newPeerUserId).select('username bio country language');
+                        } catch (e) { }
+                    }
 
-                    // Also tell the new guy about existing participants so he can prepare?
-                    // Actually, 'user-joined' to existing is enough if existing initiate.
-                    // If we want new guy to initiate, we send him the list.
-                    // Let's have EXISTING participants initiate to the new guy.
+                    const newPeerData = {
+                        peerId: newPeerId,
+                        displayName: this.userNames.get(newPeerId) || 'Stranger',
+                        reputation: this.userReputations.get(newPeerId) || 100,
+                        avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newPeerId}`,
+                        username: newPeerUser?.username || 'Stranger',
+                        bio: newPeerUser?.bio || '',
+                        country: newPeerUser?.country || '',
+                        language: newPeerUser?.language || ''
+                    };
+
+                    socket.to(roomId).emit('user-joined', newPeerData);
+
                 } else {
                     socket.emit('no-users-found');
                 }
