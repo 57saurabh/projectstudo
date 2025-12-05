@@ -1,8 +1,21 @@
-import { UserModel } from '../models/User';
+import { UserModel, IUser } from '../models/User';
 
 export class UsersService {
     async getUserProfile(userId: string) {
         const user = await UserModel.findById(userId).select('-password');
+        if (!user) {
+            throw new Error('User not found');
+        }
+        return user;
+    }
+
+    async updateUser(userId: string, updates: Partial<IUser>) {
+        const user = await UserModel.findByIdAndUpdate(
+            userId,
+            { $set: updates },
+            { new: true, runValidators: true }
+        ).select('-password');
+
         if (!user) {
             throw new Error('User not found');
         }

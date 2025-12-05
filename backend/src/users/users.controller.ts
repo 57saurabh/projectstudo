@@ -16,6 +16,7 @@ export class UsersController {
     private initializeRoutes() {
         this.router.get('/search', this.searchUsers);
         this.router.get('/:id', this.getUserProfile);
+        this.router.put('/me', this.updateProfile); // Added update route
     }
 
     private getUserIdFromToken(req: express.Request): string | null {
@@ -39,6 +40,33 @@ export class UsersController {
             res.json(user);
         } catch (error: any) {
             res.status(404).json({ message: error.message });
+        }
+    };
+
+    private updateProfile = async (req: express.Request, res: express.Response) => {
+        try {
+            const userId = this.getUserIdFromToken(req);
+            if (!userId) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+
+            const allowedUpdates = [
+                'displayName', 'username', 'bio', 'website', 'profession',
+                'gender', 'age', 'country', 'region', 'university',
+                'interests', 'languages', 'languageCountries', 'avatarUrl', 'theme'
+            ];
+
+            const updates = Object.keys(req.body)
+                .filter(key => allowedUpdates.includes(key))
+                .reduce((obj: any, key) => {
+                    obj[key] = req.body[key];
+                    return obj;
+                }, {});
+
+            const user = await this.usersService.updateUser(userId, updates);
+            res.json(user);
+        } catch (error: any) {
+            res.status(500).json({ message: error.message });
         }
     };
 

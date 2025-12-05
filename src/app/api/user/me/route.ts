@@ -46,6 +46,7 @@ export async function PUT(req: Request) {
     try {
         await dbConnect();
         const authHeader = req.headers.get('authorization');
+
         let userId: string | null = null;
 
         if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -57,7 +58,6 @@ export async function PUT(req: Request) {
                 return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
             }
         } else {
-            // Fallback to x-user-id header if provided (internal use or dev)
             userId = req.headers.get('x-user-id');
         }
 
@@ -66,26 +66,48 @@ export async function PUT(req: Request) {
         }
 
         const body = await req.json();
-        const { theme } = body;
 
-        // Only allow updating specific fields for now
+        const allowedFields = [
+            "theme",
+            "displayName",
+            "username",
+            "bio",
+            "profession",
+            "website",
+            "gender",
+            "age",
+            "country",
+            "region",
+            "university",
+            "interests",
+            "languages",
+            "languageCountries",
+            "avatarUrl"
+        ];
+
         const updateData: any = {};
-        if (theme) updateData.theme = theme;
+        for (const field of allowedFields) {
+            if (body.hasOwnProperty(field)) {
+                updateData[field] = body[field];
+            }
+        }
+
+        console.log("Final updateData:", updateData);
 
         const user = await User.findByIdAndUpdate(
             userId,
             { $set: updateData },
             { new: true }
-        ).select('-password');
+        ).select("-password");
 
         if (!user) {
-            return NextResponse.json({ message: 'User not found' }, { status: 404 });
+            return NextResponse.json({ message: "User not found" }, { status: 404 });
         }
 
         return NextResponse.json(user);
 
-    } catch (error: any) {
-        console.error('Error updating user:', error);
-        return NextResponse.json({ message: 'Server error' }, { status: 500 });
+    } catch (error) {
+        console.error("PUT /user/me error:", error);
+        return NextResponse.json({ message: "Server error" }, { status: 500 });
     }
 }

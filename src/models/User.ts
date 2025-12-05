@@ -75,6 +75,11 @@ export interface IUser {
     gender?: "male" | "female" | "other";
     age?: number;
     country?: string;
+    region?: string[];
+    university?: string;
+    interests?: string[];
+    languages?: string[];
+    languageCountries?: string[];
     language?: string;
     theme?: 'light' | 'dark';
 
@@ -189,6 +194,11 @@ const UserSchema: Schema = new Schema({
     gender: { type: String, enum: ["male", "female", "other"] },
     age: { type: Number },
     country: { type: String },
+    region: [String],
+    university: { type: String },
+    interests: [String],
+    languages: [String],
+    languageCountries: [String],
     language: { type: String },
     theme: { type: String, enum: ['light', 'dark'], default: 'dark' },
 

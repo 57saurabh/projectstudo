@@ -71,6 +71,7 @@ async function startServer() {
         // Initialize Users Module
         const usersController = new UsersController();
         app.use('/api/users', usersController.router);
+        app.use('/api/user', usersController.router); // Alias for singular route consistency
 
         server.listen(PORT, () => {
             console.log(`🚀 Backend Server running on port ${PORT}`);

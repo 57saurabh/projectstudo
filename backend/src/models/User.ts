@@ -75,7 +75,12 @@ export interface IUser {
     gender?: "male" | "female" | "other";
     age?: number;
     country?: string;
-    language?: string;
+    region?: string; // For UI consistency, though we might map to country
+    university?: string;
+    interests?: string[];
+    languages?: string[];
+    languageCountries?: string[]; // For UI persistence of selected flags
+    language?: string; // Keep for backward compatibility or primary language
     theme?: 'light' | 'dark';
 
     // Status
@@ -189,6 +194,11 @@ const UserSchema: Schema = new Schema({
     gender: { type: String, enum: ["male", "female", "other"] },
     age: { type: Number },
     country: { type: String },
+    region: [String],
+    university: { type: String },
+    interests: [String],
+    languages: [String],
+    languageCountries: [String],
     language: { type: String },
     theme: { type: String, enum: ['light', 'dark'], default: 'dark' },
 

@@ -9,8 +9,10 @@ import { useWebRTC } from '@/lib/webrtc/useWebRTC';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import WebcamCapture from '@/components/profile/WebcamCapture';
-import { COUNTRIES, LANGUAGES } from '@/lib/constants';
+import { COUNTRIES, LANGUAGES, INTERESTS_LIST, UNIVERSITIES_LIST, COUNTRY_LANGUAGES_MAPPING, LANGUAGE_FLAGS } from '@/lib/constants';
 import { faceDetectionService } from '@/lib/ai/FaceDetectionService';
+import Image from 'next/image';
+import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
 
 export default function PreCheckPage() {
     const router = useRouter();
@@ -34,12 +36,23 @@ export default function PreCheckPage() {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [isCapturing, setIsCapturing] = useState(false);
+    
+    // Form State
     const [formData, setFormData] = useState({
         displayName: '',
         bio: '',
         country: '',
-        language: ''
+        region: [] as string[],
+        university: '',
+        interests: [] as string[],
+        languages: [] as string[],
+        languageCountries: [] as string[]
     });
+    
+    // Custom Input State
+    const [customInterest, setCustomInterest] = useState('');
+    const [universitySearch, setUniversitySearch] = useState('');
+    const [showUniSuggestions, setShowUniSuggestions] = useState(false);
 
     // Fetch User Data
     useEffect(() => {
@@ -54,8 +67,13 @@ export default function PreCheckPage() {
                     displayName: res.data.displayName || '',
                     bio: res.data.bio || '',
                     country: res.data.country || '',
-                    language: res.data.language || ''
+                    region: res.data.region || [],
+                    university: res.data.university || '',
+                    interests: res.data.interests || [],
+                    languages: res.data.languages || [],
+                    languageCountries: res.data.languageCountries || []
                 });
+                setUniversitySearch(res.data.university || '');
             } catch (error) {
                 console.error('Failed to fetch user:', error);
             } finally {
@@ -71,8 +89,6 @@ export default function PreCheckPage() {
             videoRef.current.srcObject = localStream;
         }
     }, [localStream]);
-
-    // ... (inside component)
 
     useEffect(() => {
         const loadModel = async () => {
@@ -130,6 +146,15 @@ export default function PreCheckPage() {
         };
     }, [localStream]);
 
+    const toggleRegion = (r: string) => {
+        const currentRegions = Array.isArray(formData.region) ? formData.region : [];
+        if (currentRegions.includes(r)) {
+            setFormData(prev => ({ ...prev, region: currentRegions.filter(reg => reg !== r) }));
+        } else {
+            setFormData(prev => ({ ...prev, region: [...currentRegions, r] }));
+        }
+    };
+
     const handleStartMatching = () => {
         if (faceDetected) {
             sessionStorage.setItem('preCheckPassed', 'true');
@@ -140,7 +165,11 @@ export default function PreCheckPage() {
     const handleSaveProfile = async () => {
         if (!token) return;
         try {
-            const res = await axios.put('/api/user/me', formData, {
+            const payload = {
+                ...formData,
+                university: UNIVERSITIES_LIST.includes(universitySearch) ? universitySearch : ''
+            };
+            const res = await axios.put('/api/user/me', payload, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setUser(res.data);
@@ -165,7 +194,64 @@ export default function PreCheckPage() {
         }
     };
 
+    // --- Helpers ---
+    const addInterest = (interest: string) => {
+        if (!interest.trim()) return;
+        if (!formData.interests.includes(interest.trim())) {
+            setFormData(prev => ({ ...prev, interests: [...prev.interests, interest.trim()] }));
+        }
+        setCustomInterest('');
+    };
+
+    const removeInterest = (interest: string) => {
+        setFormData(prev => ({ ...prev, interests: prev.interests.filter(i => i !== interest) }));
+    };
+
+    const toggleLanguageCountry = (countryName: string) => {
+        const currentCountries = formData.languageCountries || [];
+        let newCountries;
+        
+        if (currentCountries.includes(countryName)) {
+            newCountries = currentCountries.filter(c => c !== countryName);
+        } else {
+            newCountries = [...currentCountries, countryName];
+        }
+
+        // Re-calculate languages based on selected countries
+        const allLanguages = new Set<string>();
+        newCountries.forEach(c => {
+            const mapping = COUNTRY_LANGUAGES_MAPPING[c];
+            if (mapping) {
+                mapping.languages.forEach(l => allLanguages.add(l));
+            }
+        });
+
+        setFormData(prev => ({
+            ...prev,
+            languageCountries: newCountries,
+            languages: Array.from(allLanguages)
+        }));
+    };
+
+    const selectUniversity = (uni: string) => {
+        setUniversitySearch(uni);
+        setFormData(prev => ({ ...prev, university: uni }));
+        setShowUniSuggestions(false);
+    };
+
+    const handleUniversityBlur = () => {
+        setTimeout(() => {
+            setShowUniSuggestions(false);
+            if (!UNIVERSITIES_LIST.includes(universitySearch)) {
+                setUniversitySearch(formData.university || '');
+            }
+        }, 200);
+    };
+
     if (loading) return <div className="flex min-h-screen items-center justify-center bg-[#191121] text-white">Loading...</div>;
+
+    const isIndia = formData.country === 'India';
+    const filteredUniversities = UNIVERSITIES_LIST.filter(u => u.toLowerCase().includes(universitySearch.toLowerCase()));
 
     return (
         <div className="flex min-h-screen w-full flex-col lg:flex-row items-center justify-center bg-[#191121] p-4 lg:p-6 gap-6 lg:gap-8">
@@ -224,8 +310,8 @@ export default function PreCheckPage() {
             </div>
 
             {/* Right Side: Profile Details */}
-            <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-6">
-                <div className="flex items-center justify-between">
+            <div className="w-full max-w-md bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col gap-6 max-h-[80vh] overflow-y-auto custom-scrollbar">
+                <div className="flex items-center justify-between sticky top-0 bg-[#191121]/90 backdrop-blur-sm z-10 py-2 -mx-2 px-2">
                     <h2 className="text-xl font-bold text-white">Your Profile</h2>
                     {!isEditing ? (
                         <button
@@ -295,9 +381,10 @@ export default function PreCheckPage() {
                             )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        {/* Country & Region */}
+                        <div className="grid grid-cols-1 gap-4">
                             <div>
-                                <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Country</label>
+                                <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Country of Residence</label>
                                 {isEditing ? (
                                     <select
                                         value={formData.country}
@@ -313,24 +400,195 @@ export default function PreCheckPage() {
                                     <p className="text-white text-sm">{user?.country || "Not set"}</p>
                                 )}
                             </div>
+
                             <div>
-                                <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Language</label>
+                                <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Region Preference</label>
                                 {isEditing ? (
-                                    <select
-                                        value={formData.language}
-                                        onChange={(e) => setFormData({ ...formData, language: e.target.value })}
-                                        className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-[#7f19e6] outline-none mt-1 appearance-none"
-                                    >
-                                        <option value="" className="bg-[#191121]">Select Language</option>
-                                        {LANGUAGES.map(l => (
-                                            <option key={l} value={l} className="bg-[#191121]">{l}</option>
-                                        ))}
-                                    </select>
+                                    <div className="bg-black/20 border border-white/10 rounded-lg p-2 max-h-40 overflow-y-auto custom-scrollbar mt-1">
+                                        <div className="grid grid-cols-2 gap-1">
+                                            {COUNTRIES.filter(c => c !== 'Pakistan').map(c => {
+                                                const isSelected = (Array.isArray(formData.region) ? formData.region : []).includes(c);
+                                                return (
+                                                    <div 
+                                                        key={c}
+                                                        onClick={() => toggleRegion(c)}
+                                                        className={`cursor-pointer px-2 py-1.5 rounded text-xs transition-all flex items-center justify-between ${
+                                                            isSelected 
+                                                            ? 'bg-[#7f19e6]/20 border border-[#7f19e6] text-[#7f19e6]' 
+                                                            : 'bg-white/5 border border-transparent hover:bg-white/10 text-white/70'
+                                                        }`}
+                                                    >
+                                                        <span className="truncate">{c}</span>
+                                                        {isSelected && <CheckCircle size={10} />}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
                                 ) : (
-                                    <p className="text-white text-sm">{user?.language || "Not set"}</p>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {(user?.region && Array.isArray(user.region) && user.region.length > 0) ? (
+                                            user.region.map((r: string) => (
+                                                <span key={r} className="px-2 py-0.5 rounded-full bg-white/10 text-white/80 text-[10px]">{r}</span>
+                                            ))
+                                        ) : (
+                                            <p className="text-white text-sm">Global</p>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <label className="text-xs font-bold text-white/40 uppercase tracking-wider">University</label>
+                                {isEditing ? (
+                                    <div className="relative">
+                                        <input
+                                            type="text"
+                                            value={universitySearch}
+                                            onChange={(e) => {
+                                                setUniversitySearch(e.target.value);
+                                                setShowUniSuggestions(true);
+                                                if (formData.university && e.target.value !== formData.university) {
+                                                    setFormData({ ...formData, university: '' });
+                                                }
+                                            }}
+                                            onFocus={() => setShowUniSuggestions(true)}
+                                            onBlur={handleUniversityBlur}
+                                            className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-[#7f19e6] outline-none mt-1"
+                                            placeholder="Search University..."
+                                        />
+                                        {showUniSuggestions && universitySearch && (
+                                            <div className="absolute z-20 w-full bg-[#191121] border border-white/10 rounded-lg mt-1 max-h-40 overflow-y-auto shadow-xl custom-scrollbar">
+                                                {filteredUniversities.length > 0 ? (
+                                                    filteredUniversities.map(uni => (
+                                                        <div
+                                                            key={uni}
+                                                            className="px-3 py-2 hover:bg-white/10 cursor-pointer text-sm text-white"
+                                                            onClick={() => selectUniversity(uni)}
+                                                        >
+                                                            {uni}
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="px-3 py-2 text-white/50 text-sm">No matches found</div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <p className="text-white text-sm">{user?.university || "Not set"}</p>
                                 )}
                             </div>
                         </div>
+
+                        {/* Interests */}
+                        <div>
+                            <label className="text-xs font-bold text-white/40 uppercase tracking-wider">Interests</label>
+                            {isEditing ? (
+                                <div className="mt-1 space-y-2">
+                                    <div className="flex flex-wrap gap-2">
+                                        {(formData.interests || []).map(interest => (
+                                            <span key={interest} className="px-2 py-1 rounded-full bg-[#7f19e6]/20 text-[#7f19e6] text-xs flex items-center gap-1">
+                                                {interest}
+                                                <button onClick={() => removeInterest(interest)} className="hover:text-white"><XCircle size={12} /></button>
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={customInterest}
+                                            onChange={(e) => setCustomInterest(e.target.value)}
+                                            onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    addInterest(customInterest);
+                                                }
+                                            }}
+                                            className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-white text-sm focus:border-[#7f19e6] outline-none"
+                                            placeholder="Add interest..."
+                                        />
+                                        <button onClick={() => addInterest(customInterest)} className="px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20 text-xs text-white">Add</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-1">
+                                        {INTERESTS_LIST.slice(0, 5).map(interest => (
+                                            <button
+                                                key={interest}
+                                                onClick={() => addInterest(interest)}
+                                                className="px-2 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] text-white/70 hover:border-[#7f19e6] transition-colors"
+                                            >
+                                                {interest}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {(user?.interests && user.interests.length > 0) ? (
+                                        user.interests.map((i: string) => (
+                                            <span key={i} className="px-2 py-1 rounded-full bg-white/10 text-white/80 text-xs">{i}</span>
+                                        ))
+                                    ) : (
+                                        <p className="text-white/50 text-sm">No interests added.</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Languages */}
+                        {/* Languages */}
+                        {/* Languages */}
+                        <div className="relative">
+                            <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-1 block">Languages (Flags)</label>
+                            {isEditing ? (
+                                <MultiSelectDropdown
+                                    label=""
+                                    placeholder="Select countries to include..."
+                                    options={LANGUAGE_FLAGS.map(lf => ({
+                                        value: lf.country,
+                                        label: lf.country,
+                                        flag: lf.flag,
+                                        languages: lf.languages
+                                    }))}
+                                    selectedValues={formData.languageCountries || []}
+                                    onChange={(newCountries) => {
+                                        const allLanguages = new Set<string>();
+                                        newCountries.forEach(c => {
+                                            const mapping = COUNTRY_LANGUAGES_MAPPING[c];
+                                            if (mapping) {
+                                                mapping.languages.forEach(l => allLanguages.add(l));
+                                            }
+                                        });
+                                        setFormData(prev => ({
+                                            ...prev,
+                                            languageCountries: newCountries,
+                                            languages: Array.from(allLanguages)
+                                        }));
+                                    }}
+                                />
+                            ) : (
+                                <div className="flex flex-wrap gap-2 mt-1 min-h-[42px] items-center">
+                                    {(user?.languageCountries && user.languageCountries.length > 0) ? (
+                                        user.languageCountries.map((c: string) => {
+                                            const mapping = COUNTRY_LANGUAGES_MAPPING[c];
+                                            return mapping ? (
+                                                <div key={c} className="w-8 h-6 relative shrink-0 shadow-sm border border-white/10 rounded-sm" title={c}>
+                                                    <Image 
+                                                        src={mapping.flag} 
+                                                        alt={c} 
+                                                        fill 
+                                                        className="object-cover rounded-[1px]" 
+                                                    />
+                                                </div>
+                                            ) : null;
+                                        })
+                                    ) : (
+                                        <p className="text-white/50 text-sm">No languages set.</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
                     </div>
                 </div>
             </div>

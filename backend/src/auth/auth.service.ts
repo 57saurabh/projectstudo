@@ -1,18 +1,29 @@
-import { UserModel, IUser } from '../models/User';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { v4 as uuidv4 } from 'uuid';
+import { generateHumorousUsername } from '../utils/usernameGenerator';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';
+// ... (imports)
 
 export class AuthService {
     async signup(userData: any) {
-        const { email, password, displayName, username } = userData;
+        const { email, password, displayName } = userData;
 
-        // Check if user exists
-        const existingUser = await UserModel.findOne({ $or: [{ email }, { username }] });
-        if (existingUser) {
-            throw new Error('User already exists with that email or username');
+        // Check if user exists by email
+        const existingEmail = await UserModel.findOne({ email });
+        if (existingEmail) {
+            throw new Error('Email is already registered');
+        }
+
+        // Auto-generate Unique Username
+        let username = userData.username;
+
+        // Always generate a new unique username as per requirement
+        // "every time when user create always create new unique and humaruos username"
+        let isUnique = false;
+        while (!isUnique) {
+            username = generateHumorousUsername();
+            const existing = await UserModel.findOne({ username });
+            if (!existing) {
+                isUnique = true;
+            }
         }
 
         // Hash password
@@ -24,7 +35,7 @@ export class AuthService {
             email,
             password: hashedPassword,
             displayName: displayName || username,
-            username,
+            username, // Use the generated username
             privateId: uuidv4(),
             status: 'online',
             lastActive: Date.now()
