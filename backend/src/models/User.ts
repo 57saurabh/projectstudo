@@ -1,235 +1,317 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, { Schema, Document, Model } from "mongoose";
 
-// Plain interface for frontend and general use
+/* ============================================================
+   1. STRONG TYPESCRIPT INTERFACES
+   ============================================================ */
+
+export interface IProfession {
+    title: string;
+    company?: string;
+    university?: string;
+}
+
+export interface IConnectedAccount {
+    connected: boolean;
+    token?: string;
+    channelId?: string;
+    accountId?: string;
+}
+
+export interface IStory {
+    id: string;
+    mediaUrl: string;
+    caption?: string;
+    views: number;
+    createdAt: number;
+    expiresAt: number;
+}
+
+export interface IHighlight {
+    id: string;
+    title: string;
+    coverImageUrl: string;
+    storyIds: string[];
+    createdAt: number;
+}
+
+export interface IUserPrivacy {
+    isPrivate: boolean;
+    allowMessagesFrom: "everyone" | "followers" | "none";
+    allowStoryRepliesFrom: "everyone" | "followers" | "none";
+    allowTagging: "everyone" | "followers" | "none";
+    twoFactorEnabled: boolean;
+}
+
+export interface IUserInsights {
+    profileVisits: number;
+    reach: number;
+    impressions: number;
+    engagementRate?: number;
+}
+
+export interface IUserPreferences {
+    matchGender?: "male" | "female" | "any";
+    matchRegion?: "same-country" | "global";
+    minAge?: number;
+    maxAge?: number;
+
+    // Moved from top-level
+    region?: string[];
+    languages?: string[];
+    languageCountries?: string[];
+}
+
+export interface IUserConnection {
+    socketId?: string;
+    roomId?: string;
+    isCameraOn: boolean;
+    isMicOn: boolean;
+}
+
+export interface IUserReports {
+    count: number;
+    reasons: string[];
+}
+
+/* ============================================================
+   2. MAIN USER INTERFACE
+   ============================================================ */
+
 export interface IUser {
     _id: string;
-    id?: string; // For backward compatibility
     email: string;
+    password?: string;
+
     privateId: string;
     displayName?: string;
     username?: string;
     phone?: string;
 
-    // Profile visuals
     avatarUrl?: string;
     coverPhotoUrl?: string;
 
-    // Social-style profile
-    bio?: string;
-    website?: string;
-    profession?: string;
+    bio: string;
+    website: string;
+    profession: IProfession;
     isVerified: boolean;
     category?: string;
 
-    // Social metrics
     followers: number;
     following: number;
-    friends: string[]; // Array of User IDs
+    friends: string[];
+
     connectedAccounts: {
-        youtube?: { connected: boolean; token?: string; channelId?: string };
-        instagram?: { connected: boolean; token?: string; accountId?: string };
+        youtube: IConnectedAccount;
+        instagram: IConnectedAccount;
     };
 
-    // Story system
-    stories: Array<{
-        id: string;
-        mediaUrl: string;
-        caption?: string;
-        views: number;
-        createdAt: number;
-        expiresAt: number;
-    }>;
+    stories: IStory[];
+    highlights: IHighlight[];
 
-    // Highlights
-    highlights: Array<{
-        id: string;
-        title: string;
-        coverImageUrl: string;
-        storyIds: string[];
-        createdAt: number;
-    }>;
-
-    // User interaction
     blockedUsers: string[];
     mutedUsers: string[];
     savedStories: string[];
 
-    // Insights
-    insights: {
-        profileVisits: number;
-        reach: number;
-        impressions: number;
-        engagementRate?: number;
-    };
+    insights: IUserInsights;
 
-    // Privacy
-    privacy: {
-        isPrivate: boolean;
-        allowMessagesFrom: "everyone" | "followers" | "none";
-        allowStoryRepliesFrom: "everyone" | "followers" | "none";
-        allowTagging: "everyone" | "followers" | "none";
-        twoFactorEnabled: boolean;
-    };
+    privacy: IUserPrivacy;
 
-    // Demographics
     gender?: "male" | "female" | "other";
     age?: number;
     country?: string;
-    region?: string; // For UI consistency, though we might map to country
-    university?: string;
-    interests?: string[];
-    languages?: string[];
-    languageCountries?: string[]; // For UI persistence of selected flags
-    language?: string; // Keep for backward compatibility or primary language
-    theme?: 'light' | 'dark';
+    university?: string; // Kept for backward compat or maybe remove? Schema has it inside profession now for students? prompt says "if user select student then option for university will come". I'll put it in IProfession. Removing from top level to avoid confusion.
 
-    // Status
+    interests: string[];
+    // languages removed
+    // languageCountries removed
+    // language single removed? Prompt said "move language, region". I will move plural ones. The single 'language' might be UI language? I'll move plural ones as per context `preferences`.
+
+    theme: "light" | "dark";
+
     status: "online" | "offline" | "searching" | "in-call";
     lastActive: number;
 
-    // Match preferences
-    preferences: {
-        matchGender?: "male" | "female" | "any";
-        matchRegion?: "same-country" | "global";
-        minAge?: number;
-        maxAge?: number;
-    };
+    preferences: IUserPreferences;
 
-    // Connection info
-    connection: {
-        socketId?: string;
-        roomId?: string;
-        isCameraOn: boolean;
-        isMicOn: boolean;
-    };
+    connection: IUserConnection;
 
-    // Moderation
-    reports: {
-        count: number;
-        reasons: string[];
-    };
+    reports: IUserReports;
 
-    // Account restrictions
     isBanned: boolean;
-
     reputationScore: number;
-    createdAt: string | Date;
-    updatedAt: string | Date;
+
+    createdAt: Date | string;
+    updatedAt: Date | string;
 }
 
-// Mongoose Document interface
-export interface UserDocument extends Omit<IUser, '_id'>, Document {
-    _id: any; // Override to allow string or ObjectId
+/* ============================================================
+   3. MONGOOSE DOCUMENT INTERFACE
+   ============================================================ */
+
+export interface UserDocument extends IUser, Document {
+    _id: any;
 }
 
-const UserSchema: Schema = new Schema({
-    email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    privateId: { type: String, required: true, unique: true },
-    displayName: { type: String },
-    username: { type: String, unique: true, sparse: true },
-    phone: { type: String },
+/* ============================================================
+   4. MONGOOSE SCHEMA
+   ============================================================ */
 
-    avatarUrl: { type: String },
-    coverPhotoUrl: { type: String },
+const UserSchema = new Schema<UserDocument>(
+    {
+        email: { type: String, required: true, unique: true },
+        password: { type: String, required: true },
 
-    bio: { type: String },
-    website: { type: String },
-    profession: { type: String },
-    isVerified: { type: Boolean, default: false },
-    category: { type: String },
+        privateId: { type: String, required: true, unique: true },
+        displayName: { type: String },
+        username: { type: String, unique: true, sparse: true },
+        phone: { type: String },
 
-    followers: { type: Number, default: 0 },
-    following: { type: Number, default: 0 },
-    friends: [{ type: Schema.Types.ObjectId, ref: 'User' }],
-    connectedAccounts: {
-        youtube: {
-            connected: { type: Boolean, default: false },
-            token: String,
-            channelId: String
+        avatarUrl: { type: String },
+        coverPhotoUrl: { type: String },
+
+        bio: { type: String, default: "" },
+        website: { type: String, default: "" },
+        profession: {
+            title: { type: String, default: "" },
+            company: { type: String },
+            university: { type: String }
         },
-        instagram: {
-            connected: { type: Boolean, default: false },
-            token: String,
-            accountId: String
-        }
+        isVerified: { type: Boolean, default: false },
+        category: { type: String },
+
+        followers: { type: Number, default: 0 },
+        following: { type: Number, default: 0 },
+
+        friends: [{ type: Schema.Types.ObjectId, ref: "User" }],
+
+        connectedAccounts: {
+            youtube: {
+                connected: { type: Boolean, default: false },
+                token: String,
+                channelId: String
+            },
+            instagram: {
+                connected: { type: Boolean, default: false },
+                token: String,
+                accountId: String
+            }
+        },
+
+        stories: [
+            {
+                id: String,
+                mediaUrl: String,
+                caption: String,
+                views: { type: Number, default: 0 },
+                createdAt: Number,
+                expiresAt: Number
+            }
+        ],
+
+        highlights: [
+            {
+                id: String,
+                title: String,
+                coverImageUrl: String,
+                storyIds: [String],
+                createdAt: Number
+            }
+        ],
+
+        blockedUsers: [String],
+        mutedUsers: [String],
+        savedStories: [String],
+
+        insights: {
+            profileVisits: { type: Number, default: 0 },
+            reach: { type: Number, default: 0 },
+            impressions: { type: Number, default: 0 },
+            engagementRate: { type: Number, default: 0 }
+        },
+
+        privacy: {
+            isPrivate: { type: Boolean, default: false },
+            allowMessagesFrom: {
+                type: String,
+                enum: ["everyone", "followers", "none"],
+                default: "everyone"
+            },
+            allowStoryRepliesFrom: {
+                type: String,
+                enum: ["everyone", "followers", "none"],
+                default: "everyone"
+            },
+            allowTagging: {
+                type: String,
+                enum: ["everyone", "followers", "none"],
+                default: "everyone"
+            },
+            twoFactorEnabled: { type: Boolean, default: false }
+        },
+
+        gender: { type: String, enum: ["male", "female", "other"] },
+        age: Number,
+        country: String,
+        // region removed
+        // university removed (moved to profession)
+
+        interests: { type: [String], default: [] },
+        // languages removed
+        // languageCountries removed
+
+        theme: { type: String, enum: ["light", "dark"], default: "dark" },
+
+        status: {
+            type: String,
+            enum: ["online", "offline", "searching", "in-call"],
+            default: "offline"
+        },
+
+        lastActive: { type: Number, default: Date.now },
+
+        preferences: {
+            matchGender: {
+                type: String,
+                enum: ["male", "female", "any"],
+                default: "any"
+            },
+            matchRegion: {
+                type: String,
+                enum: ["same-country", "global"],
+                default: "global"
+            },
+            minAge: Number,
+            maxAge: Number,
+
+            region: { type: [String], default: [] },
+            languages: { type: [String], default: [] },
+            languageCountries: { type: [String], default: [] }
+        },
+
+        connection: {
+            socketId: String,
+            roomId: String,
+            isCameraOn: { type: Boolean, default: false },
+            isMicOn: { type: Boolean, default: false }
+        },
+
+        reports: {
+            count: { type: Number, default: 0 },
+            reasons: [String]
+        },
+
+        isBanned: { type: Boolean, default: false },
+        reputationScore: { type: Number, default: 100 },
+
+        createdAt: { type: Date, default: Date.now },
+        updatedAt: { type: Date, default: Date.now }
     },
+    { timestamps: true }
+);
 
-    stories: [{
-        id: String,
-        mediaUrl: String,
-        caption: String,
-        views: { type: Number, default: 0 },
-        createdAt: Number,
-        expiresAt: Number
-    }],
+/* ============================================================
+   5. EXPORT MODEL
+   ============================================================ */
 
-    highlights: [{
-        id: String,
-        title: String,
-        coverImageUrl: String,
-        storyIds: [String],
-        createdAt: Number
-    }],
-
-    blockedUsers: [String],
-    mutedUsers: [String],
-    savedStories: [String],
-
-    insights: {
-        profileVisits: { type: Number, default: 0 },
-        reach: { type: Number, default: 0 },
-        impressions: { type: Number, default: 0 },
-        engagementRate: { type: Number, default: 0 }
-    },
-
-    privacy: {
-        isPrivate: { type: Boolean, default: false },
-        allowMessagesFrom: { type: String, enum: ["everyone", "followers", "none"], default: "everyone" },
-        allowStoryRepliesFrom: { type: String, enum: ["everyone", "followers", "none"], default: "everyone" },
-        allowTagging: { type: String, enum: ["everyone", "followers", "none"], default: "everyone" },
-        twoFactorEnabled: { type: Boolean, default: false }
-    },
-
-    gender: { type: String, enum: ["male", "female", "other"] },
-    age: { type: Number },
-    country: { type: String },
-    region: [String],
-    university: { type: String },
-    interests: [String],
-    languages: [String],
-    languageCountries: [String],
-    language: { type: String },
-    theme: { type: String, enum: ['light', 'dark'], default: 'dark' },
-
-    status: { type: String, enum: ["online", "offline", "searching", "in-call"], default: "offline" },
-    lastActive: { type: Number, default: Date.now },
-
-    preferences: {
-        matchGender: { type: String, enum: ["male", "female", "any"], default: "any" },
-        matchRegion: { type: String, enum: ["same-country", "global"], default: "global" },
-        minAge: { type: Number },
-        maxAge: { type: Number }
-    },
-
-    connection: {
-        socketId: String,
-        roomId: String,
-        isCameraOn: { type: Boolean, default: false },
-        isMicOn: { type: Boolean, default: false }
-    },
-
-    reports: {
-        count: { type: Number, default: 0 },
-        reasons: [String]
-    },
-
-    isBanned: { type: Boolean, default: false },
-
-    reputationScore: { type: Number, default: 100 },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-}, { timestamps: true });
-
-// Check if the model is already defined to prevent OverwriteModelError
-export const UserModel = mongoose.models.User || mongoose.model<UserDocument>('User', UserSchema);
+export const UserModel: Model<UserDocument> =
+    mongoose.models.User || mongoose.model<UserDocument>("User", UserSchema);

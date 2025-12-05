@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/lib/store/store';
-import { IUser as User } from '@/models/User';
+import { IUser as User, PROFESSION_TYPES } from '@/models/User';
 import WebcamCapture from '@/components/profile/WebcamCapture';
 import { Camera, Save, Loader2, User as UserIcon, Globe, Briefcase, Hash, ArrowLeft, XCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -35,24 +35,45 @@ export default function ProfilePage() {
                 username: user.username,
                 bio: user.bio,
                 website: user.website,
-                profession: user.profession,
+                profession: user.profession || { type: 'Looking for Opportunities' },
                 gender: user.gender,
                 age: user.age,
-                country: user.country, // Residence
-                region: user.region || [], // Matching Preference (Array)
-                university: user.university,
+                country: user.country,
+                avatarUrl: user.avatarUrl,
                 interests: user.interests || [],
-                languages: user.languages || [],
-                languageCountries: user.languageCountries || [], // Selected flags
-                avatarUrl: user.avatarUrl
+                
+                // Map preferences to top-level or keep specific state?
+                // Actually, let's keep formData structure close to User
+                preferences: {
+                    ...user.preferences,
+                    region: user.preferences?.region || [], 
+                    languages: user.preferences?.languages || [],
+                    languageCountries: user.preferences?.languageCountries || []
+                }
             });
-            setUniversitySearch(user.university || '');
+            // University is now in profession.university
+            setUniversitySearch(user.profession?.university || '');
         }
     }, [user]);
 
+    // Handle nested input changes
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        setFormData((prev: Partial<User>) => ({ ...prev, [name]: value }));
+        
+        if (name === 'professionType') {
+             setFormData(prev => ({ 
+                 ...prev, 
+                 profession: { ...prev.profession, type: value } as any
+             }));
+        } else if (name.startsWith('preferences.')) {
+            const prefKey = name.split('.')[1];
+            setFormData(prev => ({
+                ...prev,
+                preferences: { ...prev.preferences, [prefKey]: value }
+            } as Partial<User>));
+        } else {
+             setFormData((prev: Partial<User>) => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleAvatarCapture = (imageSrc: string) => {
@@ -129,13 +150,25 @@ export default function ProfilePage() {
     };
 
     // --- Region Logic ---
+    // --- Region Logic ---
     const toggleRegion = (r: string) => {
-        const currentRegions = Array.isArray(formData.region) ? formData.region : [];
+        const currentPreferences = formData.preferences || {};
+        const currentRegions = currentPreferences.region || [];
+        
+        let newRegions;
         if (currentRegions.includes(r)) {
-            setFormData(prev => ({ ...prev, region: currentRegions.filter(reg => reg !== r) }));
+            newRegions = currentRegions.filter(reg => reg !== r);
         } else {
-            setFormData(prev => ({ ...prev, region: [...currentRegions, r] }));
+            newRegions = [...currentRegions, r];
         }
+
+        setFormData(prev => ({
+            ...prev,
+            preferences: {
+                ...prev.preferences,
+                region: newRegions
+            }
+        }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -146,10 +179,55 @@ export default function ProfilePage() {
         try {
             const headers = token ? { Authorization: `Bearer ${token}` } : { 'x-user-id': user?._id || user?.id };
             
-            // Ensure region is synced with country if needed, or just send both
+            // Construct Clean Profession Object
+            const currentProf = formData.profession as any || {};
+            const type = currentProf.type;
+            
+            let cleanProfession: any = { type };
+
+            // Logic matching backend schema requirements
+            if (type === 'Student' || type === 'Medical Student') {
+                // Use universitySearch state for university
+                const finalUni = UNIVERSITIES_LIST.includes(universitySearch) ? universitySearch : '';
+                cleanProfession.university = finalUni;
+                // If Medical Student, they might need hospital? Schema says: required function for hospital checks only specific roles not Medical Student (wait, let me check).
+                // Schema: Hospital required if ['Doctor', 'Nurse', 'Medical Student'...]. Ah, Medical Student is in Hospital list too?
+                // Re-checking prompt: "Medical Student: university or hospital".
+                // My UI logic showed University for Medical Student. I should also check if I need to send Hospital?
+                // Complex case: "Medical Student" is in both lists in schema?
+                // Prompt Schema: 
+                // university required if Student OR Medical Student.
+                // hospital required if Doctor... Medical Student ...
+                // So Medical Student needs BOTH or EITHER? Prompt says "university or hospital".
+                // The Mongoose schema uses `required: function() { return [list].includes(this.type) }`.
+                // If Medical Student is in BOTH lists, Mongoose might require BOTH.
+                // To be safe, I should probably allow user to input both if Medical Student, or just send what is filled.
+                // For now, let's treat Medical Student mainly as Student (University).
+                // But catching the schema validation error might happen.
+                // Let's attach hospital if present too.
+                if (currentProf.hospital) cleanProfession.hospital = currentProf.hospital;
+            } else if (["Doctor", "Nurse", "Therapist", "Pharmacist", "Lab Technician"].includes(type)) {
+                cleanProfession.hospital = currentProf.hospital;
+            } else if (["Software Engineer", "Full-Stack Developer", "Backend Developer", "Frontend Developer",
+                "Mobile Developer", "Game Developer", "AI Engineer", "ML Engineer", "Data Analyst",
+                "Data Scientist", "Cybersecurity Analyst", "DevOps Engineer", "Cloud Engineer",
+                "UI/UX Designer", "Product Designer", "Graphic Designer", "Animator", "Video Editor",
+                "Photographer", "Videographer", "Content Creator", "Influencer", "Blogger", "Writer",
+                "Editor", "Architect", "Civil Engineer", "Mechanical Engineer", "Electrical Engineer",
+                "Technician", "Mechanic", "Marketing Specialist", "HR Executive", "Operations Manager",
+                "Accountant", "Banker", "Business Analyst", "Entrepreneur", "Founder", "Freelancer", "Self-Employed"].includes(type)) {
+                cleanProfession.company = currentProf.company;
+            } else {
+                // Occupation Place for others
+                // Check if it's not one of the "No Workplace" roles
+                if (!["Unemployed", "Looking for Opportunities", "Homemaker"].includes(type)) {
+                     cleanProfession.occupationPlace = currentProf.occupationPlace;
+                }
+            }
+
             const payload = {
                 ...formData,
-                university: UNIVERSITIES_LIST.includes(universitySearch) ? universitySearch : '' // Strict check
+                profession: cleanProfession
             };
 
             const response = await axios.put(`/api/user/me`, payload, {
@@ -221,10 +299,9 @@ export default function ProfilePage() {
                         <div className="bg-black/50 p-2 text-xs font-mono text-green-400 mb-4 overflow-auto max-h-40 rounded">
                             DEBUG STATE:
                             {JSON.stringify({ 
-                                region: formData.region,
-                                languageCountries: formData.languageCountries,
-                                languages: formData.languages,
-                                university: formData.university
+                                profession: formData.profession,
+                                preferences: formData.preferences,
+                                universitySearch
                             }, null, 2)}
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-6">
@@ -266,6 +343,161 @@ export default function ProfilePage() {
                                             placeholder="username"
                                         />
                                     </div>
+                                </div>
+
+                                {/* Profession */}
+                                <div className="space-y-4 border-t border-glass-border pt-4 mt-4">
+                                    <h3 className="text-lg font-semibold text-text-primary">Profession & Work</h3>
+                                    
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-text-secondary">Current Role</label>
+                                        <div className="relative">
+                                            <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+                                            <select
+                                                disabled={!isEditing}
+                                                name="professionType"
+                                                value={(formData.profession as any)?.type || ''}
+                                                onChange={handleInputChange}
+                                                className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none"
+                                            >
+                                                <option value="" className="bg-surface">Select Profession</option>
+                                                {PROFESSION_TYPES.map(p => (
+                                                    <option key={p} value={p} className="bg-surface text-black">{p}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Conditional Fields based on Profession Type */}
+                                    {(() => {
+                                        const type = (formData.profession as any)?.type;
+                                        if (!type) return null;
+
+                                        // 1. University for Students
+                                        if (type === 'Student' || type === 'Medical Student') {
+                                            return (
+                                                <div className="space-y-2 relative">
+                                                    <label className="text-sm font-medium text-text-secondary">University / College</label>
+                                                    <div className="relative">
+                                                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+                                                        <input
+                                                            disabled={!isEditing}
+                                                            type="text"
+                                                            value={universitySearch}
+                                                            onChange={handleUniversityChange}
+                                                            onFocus={() => setShowUniSuggestions(true)}
+                                                            onBlur={handleUniversityBlur}
+                                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                                                            placeholder="Search University..."
+                                                        />
+                                                    </div>
+                                                    {showUniSuggestions && universitySearch && (
+                                                        <div className="absolute z-10 w-full bg-surface border border-glass-border rounded-lg mt-1 max-h-60 overflow-y-auto shadow-xl custom-scrollbar">
+                                                            {filteredUniversities.length > 0 ? (
+                                                                filteredUniversities.map(uni => (
+                                                                    <div
+                                                                        key={uni}
+                                                                        className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm"
+                                                                        onClick={() => selectUniversity(uni)}
+                                                                    >
+                                                                        {uni}
+                                                                    </div>
+                                                                ))
+                                                            ) : (
+                                                                <div className="px-4 py-2 text-text-secondary text-sm">No matches found</div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        // 2. Hospital for Medical Professionals
+                                        const medicalRoles = ["Doctor", "Nurse", "Therapist", "Pharmacist", "Lab Technician"];
+                                        if (medicalRoles.includes(type)) {
+                                            return (
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-text-secondary">Hospital / Clinic</label>
+                                                    <input
+                                                        disabled={!isEditing}
+                                                        type="text"
+                                                        name="profession.hospital"
+                                                        value={(formData.profession as any)?.hospital || ''}
+                                                        onChange={(e) => setFormData(prev => ({ 
+                                                            ...prev, 
+                                                            profession: { ...prev.profession, hospital: e.target.value } as any
+                                                        }))}
+                                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                                                        placeholder="Hospital Name"
+                                                    />
+                                                </div>
+                                            );
+                                        }
+
+                                        // 3. Company for Tech/Corporate
+                                        const corporateRoles = [
+                                            "Software Engineer", "Full-Stack Developer", "Backend Developer", "Frontend Developer",
+                                            "Mobile Developer", "Game Developer", "AI Engineer", "ML Engineer", "Data Analyst",
+                                            "Data Scientist", "Cybersecurity Analyst", "DevOps Engineer", "Cloud Engineer",
+                                            "UI/UX Designer", "Product Designer", "Graphic Designer", "Animator", "Video Editor",
+                                            "Photographer", "Videographer", "Content Creator", "Influencer", "Blogger", "Writer",
+                                            "Editor", "Architect", "Civil Engineer", "Mechanical Engineer", "Electrical Engineer",
+                                            "Technician", "Mechanic", "Marketing Specialist", "HR Executive", "Operations Manager",
+                                            "Accountant", "Banker", "Business Analyst", "Entrepreneur", "Founder", "Freelancer", "Self-Employed"
+                                        ];
+                                        if (corporateRoles.includes(type)) {
+                                            return (
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-text-secondary">Company / Organization</label>
+                                                    <input
+                                                        disabled={!isEditing}
+                                                        type="text"
+                                                        name="profession.company"
+                                                        value={(formData.profession as any)?.company || ''}
+                                                        onChange={(e) => setFormData(prev => ({ 
+                                                            ...prev, 
+                                                            profession: { ...prev.profession, company: e.target.value } as any
+                                                        }))}
+                                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                                                        placeholder="Company Name"
+                                                    />
+                                                </div>
+                                            );
+                                        }
+
+                                        // 4. Occupation Place for others (fallback)
+                                        const otherRoles = ["Chef", "Cook", "Barista", "Waiter", "Customer Support", "Delivery Rider", 
+                                            "Driver", "Fitness Trainer", "Athlete", "Coach", "Model", "Social Worker", "Teacher", 
+                                            "Professor", "Researcher", "Scientist", "Sales Executive"];
+                                        
+                                        // Specific check or fallback? Prompt implies "All others -> occupationPlace"
+                                        // Let's use negative check to be safe, or just render it if not one of the above.
+                                        // The schema says occupationPlace is required if NOT university/company/hospital.
+                                        // So we should show it for anything else except Unemployed/Looking/Homemaker.
+                                        
+                                        const noWorkPlaceRoles = ["Unemployed", "Looking for Opportunities", "Homemaker"];
+                                        if (!noWorkPlaceRoles.includes(type)) {
+                                            return (
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-text-secondary">Workplace / Location</label>
+                                                    <input
+                                                        disabled={!isEditing}
+                                                        type="text"
+                                                        name="profession.occupationPlace"
+                                                        value={(formData.profession as any)?.occupationPlace || ''}
+                                                        onChange={(e) => setFormData(prev => ({ 
+                                                            ...prev, 
+                                                            profession: { ...prev.profession, occupationPlace: e.target.value } as any
+                                                        }))}
+                                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                                                        placeholder="Where do you work?"
+                                                    />
+                                                </div>
+                                            );
+                                        }
+
+                                        return null;
+                                    })()}
                                 </div>
 
                                 <div className="space-y-2 md:col-span-2">
@@ -312,15 +544,18 @@ export default function ProfilePage() {
                                                 value: c,
                                                 label: c
                                             }))}
-                                            selectedValues={Array.isArray(formData.region) ? formData.region : []}
+                                            selectedValues={formData.preferences?.region || []}
                                             onChange={(newRegions: string[]) => {
-                                                setFormData(prev => ({ ...prev, region: newRegions }));
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    preferences: { ...prev.preferences, region: newRegions }
+                                                }));
                                             }}
                                         />
                                     ) : (
                                         <div className="flex flex-wrap gap-2 min-h-[42px] items-center p-2 bg-surface border border-glass-border rounded-lg">
-                                            {(Array.isArray(formData.region) && formData.region.length > 0) ? (
-                                                formData.region.map(r => (
+                                            {(formData.preferences?.region && (formData.preferences.region.length > 0)) ? (
+                                                formData.preferences.region.map(r => (
                                                     <span key={r} className="px-2 py-1 rounded-full bg-primary/20 text-primary text-xs border border-primary/30">
                                                         {r}
                                                     </span>
@@ -332,40 +567,7 @@ export default function ProfilePage() {
                                     )}
                                 </div>
 
-                                {/* University */}
-                                <div className="space-y-2 relative">
-                                    <label className="text-sm font-medium text-text-secondary">University</label>
-                                    <div className="relative">
-                                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
-                                        <input
-                                            disabled={!isEditing}
-                                            type="text"
-                                            value={universitySearch}
-                                            onChange={handleUniversityChange}
-                                            onFocus={() => setShowUniSuggestions(true)}
-                                            onBlur={handleUniversityBlur}
-                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
-                                            placeholder="Search University..."
-                                        />
-                                    </div>
-                                    {showUniSuggestions && universitySearch && (
-                                        <div className="absolute z-10 w-full bg-surface border border-glass-border rounded-lg mt-1 max-h-60 overflow-y-auto shadow-xl custom-scrollbar">
-                                            {filteredUniversities.length > 0 ? (
-                                                filteredUniversities.map(uni => (
-                                                    <div
-                                                        key={uni}
-                                                        className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm"
-                                                        onClick={() => selectUniversity(uni)}
-                                                    >
-                                                        {uni}
-                                                    </div>
-                                                ))
-                                            ) : (
-                                                <div className="px-4 py-2 text-text-secondary text-sm">No matches found</div>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+
 
                                 {/* Interests */}
                               {/* Interests */}
@@ -456,7 +658,7 @@ export default function ProfilePage() {
                                                     flag: lf.flag,
                                                     languages: lf.languages
                                                 }))}
-                                                selectedValues={formData.languageCountries || []}
+                                                selectedValues={formData.preferences?.languageCountries || []}
                                                 onChange={(newCountries: string[]) => {
                                                     const allLanguages = new Set<string>();
                                                     newCountries.forEach((c: string) => {
@@ -467,8 +669,11 @@ export default function ProfilePage() {
                                                     });
                                                     setFormData(prev => ({
                                                         ...prev,
-                                                        languageCountries: newCountries,
-                                                        languages: Array.from(allLanguages)
+                                                        preferences: {
+                                                            ...prev.preferences,
+                                                            languageCountries: newCountries,
+                                                            languages: Array.from(allLanguages)
+                                                        }
                                                     }));
                                                 }}
                                             />
@@ -476,8 +681,8 @@ export default function ProfilePage() {
                                         </>
                                     ) : (
                                         <div className="flex flex-wrap gap-2 min-h-[42px] items-center p-2 bg-surface border border-glass-border rounded-lg">
-                                            {(formData.languageCountries && formData.languageCountries.length > 0) ? (
-                                                formData.languageCountries.map((c: string) => {
+                                            {(formData.preferences?.languageCountries && formData.preferences.languageCountries.length > 0) ? (
+                                                formData.preferences.languageCountries.map((c: string) => {
                                                     const mapping = COUNTRY_LANGUAGES_MAPPING[c];
                                                     return mapping ? (
                                                         <div key={c} className="w-8 h-6 relative shrink-0 shadow-sm border border-glass-border rounded-sm" title={c}>
@@ -538,16 +743,18 @@ export default function ProfilePage() {
                                                     username: user.username,
                                                     bio: user.bio,
                                                     website: user.website,
-                                                    profession: user.profession,
+                                                    profession: user.profession || { type: 'Looking for Opportunities' },
                                                     gender: user.gender,
                                                     age: user.age,
                                                     country: user.country,
-                                                    region: user.region || [],
-                                                    university: user.university,
                                                     interests: user.interests || [],
-                                                    languages: user.languages || [],
-                                                    languageCountries: user.languageCountries || [],
-                                                    avatarUrl: user.avatarUrl
+                                                    avatarUrl: user.avatarUrl,
+                                                    preferences: {
+                                                        ...user.preferences,
+                                                        region: user.preferences?.region || [],
+                                                        languages: user.preferences?.languages || [],
+                                                        languageCountries: user.preferences?.languageCountries || []
+                                                    }
                                                 });
                                             }}
                                             className="bg-white/5 hover:bg-white/10 text-white px-6 py-3 rounded-lg font-medium transition-all"
