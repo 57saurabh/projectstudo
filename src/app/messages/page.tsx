@@ -487,7 +487,7 @@ export default function MessagesPage() {
                 <h1 className="text-3xl font-black tracking-tighter">Messages</h1>
                 <button
                     onClick={handleStartNewChat}
-                    className="px-6 py-3 bg-gold text-white rounded-2xl text-sm font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95"
+                    className="px-6 py-3 bg-gold text-primary rounded-2xl text-sm font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95"
                 >
                     New Chat
                 </button>
@@ -637,7 +637,7 @@ export default function MessagesPage() {
                                                     {lastText}
                                                 </p>
                                                 {conv.unreadCount > 0 && (
-                                                    <span className="bg-gold text-white text-[10px] font-black px-2 py-0.5 rounded-full min-w-[20px] text-center ml-2 shadow-gold-glow">
+                                                    <span className="bg-gold text-primary text-[10px] font-black px-2 py-0.5 rounded-full min-w-[20px] text-center ml-2 shadow-gold-glow">
                                                         {conv.unreadCount}
                                                     </span>
                                                 )}
@@ -711,8 +711,8 @@ export default function MessagesPage() {
                                     >
                                         <div
                                             className={`max-w-[75%] rounded-3xl px-6 py-4 shadow-md ${isMe
-                                                ? 'bg-gold text-white rounded-tr-none shadow-gold-glow'
-                                                : 'bg-accent-cream text-background rounded-tl-none'
+                                                ? 'bg-gold text-primary rounded-tr-none shadow-gold-glow'
+                                                : 'bg-accent-cream text-black rounded-tl-none'
                                                 }`}
                                         >
                                             <p className="text-sm font-medium leading-relaxed">
@@ -763,7 +763,7 @@ export default function MessagesPage() {
                                     <button
                                         type="submit"
                                         disabled={!inputText.trim()}
-                                        className="p-4 bg-gold text-white rounded-2xl hover:bg-gold-hover shadow-gold-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                                        className="p-4 bg-gold text-primary rounded-2xl hover:bg-gold-hover shadow-gold-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
                                     >
                                         <Send size={20} />
                                     </button>
@@ -791,7 +791,7 @@ export default function MessagesPage() {
                                 ) : (
                                     <button
                                         onClick={sendFriendRequest}
-                                        className="px-6 py-3 bg-gold text-white rounded-2xl text-sm font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95"
+                                        className="px-6 py-3 bg-gold text-primary rounded-2xl text-sm font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95"
                                     >
                                         Send Friend Request
                                     </button>

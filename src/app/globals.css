@@ -71,6 +71,43 @@
   --font-sans: var(--font-sans);
 }
 
+:root[data-theme="light"] {
+  /* Core Backgrounds */
+  --background: #FEF8F0;
+  --background-secondary: #F7EEDC;
+
+  /* Surfaces */
+  --surface: #FFF9F0;
+  --surface-hover: #F0E6D5;
+  --border: #E5D9C5;
+
+  /* Accents */
+  --accent-cream: #FBEEDC;
+  --accent-text: #4A4744;
+  /* Adjusted for visibility on light */
+
+  /* Gold - Primary Actions */
+  --gold: #FAB12F;
+  --gold-hover: #E29F29;
+  --gold-glow: rgba(250, 177, 47, 0.35);
+
+  /* Orange - Secondary Actions */
+  --orange: #FA812F;
+  --orange-hover: #E5732A;
+  --orange-glow: rgba(250, 129, 47, 0.35);
+
+  /* Danger - Destructive Actions */
+  --danger: #DD0303;
+  --danger-hover: #C20202;
+  --danger-glow: rgba(221, 3, 3, 0.35);
+
+  /* Text Colors */
+  --text-primary: #2C2C2C;
+  --text-secondary: #4A4744;
+  --text-muted: #6E6A67;
+  --text-gold: #C07815;
+}
+
 @utility glass {
   background-color: rgba(28, 28, 31, 0.7);
   backdrop-filter: blur(12px);

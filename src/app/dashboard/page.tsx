@@ -5,9 +5,9 @@ import { RootState, AppDispatch } from '@/lib/store/store';
 import { fetchCurrentUser } from '@/lib/store/authSlice';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { 
-    Zap, Lock, Users, Radio, 
-    Settings, UserPlus, Heart, 
+import {
+    Zap, Lock, Users, Radio,
+    Settings, UserPlus, Heart,
     Shield, Activity, Search
 } from 'lucide-react';
 
@@ -45,9 +45,9 @@ export default function DashboardPage() {
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-surface border-2 border-gold p-1">
-                        <img 
-                            src={user?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'User'}`} 
-                            alt="Profile" 
+                        <img
+                            src={user?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.username || 'User'}`}
+                            alt="Profile"
                             className="w-full h-full rounded-full bg-background-secondary"
                         />
                     </div>
@@ -61,18 +61,17 @@ export default function DashboardPage() {
 
                 <div className="flex items-center gap-4">
                     {/* Private Mode Toggle */}
-                    <button 
+                    <button
                         onClick={() => setPrivateMode(!privateMode)}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300 ${
-                            privateMode 
-                            ? 'bg-gold/10 border-gold text-gold shadow-gold-glow' 
-                            : 'bg-surface border-border text-text-muted hover:border-gold/50'
-                        }`}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all duration-300 ${privateMode
+                                ? 'bg-gold/10 border-gold text-gold shadow-gold-glow'
+                                : 'bg-surface border-border text-text-muted hover:border-gold/50'
+                            }`}
                     >
                         <Shield size={18} />
                         <span className="font-semibold">{privateMode ? 'Private Mode ON' : 'Go Private'}</span>
                     </button>
-                    
+
                     {/* Quick Settings */}
                     <Link href="/settings">
                         <button className="p-3 rounded-full bg-surface border border-border text-text-secondary hover:text-gold hover:border-gold transition-colors">
@@ -100,7 +99,7 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Grid - CTA Tiles */}
-                <motion.div 
+                <motion.div
                     className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4"
                     variants={containerVariants}
                     initial="hidden"
@@ -111,10 +110,10 @@ export default function DashboardPage() {
                         <Link href="/call/pre-check" className="block h-full">
                             <div className="h-full p-8 rounded-[2rem] bg-gradient-to-r from-gold/20 via-surface to-surface border border-gold/30 hover:border-gold hover:shadow-gold-glow transition-all duration-300 group relative overflow-hidden">
                                 <div className="relative z-10 flex flex-col justify-center h-full">
-                                    <div className="w-12 h-12 rounded-full bg-gold flex items-center justify-center mb-4 text-background font-bold">
+                                    <div className="w-12 h-12 rounded-full bg-gold flex items-center justify-center mb-4 text-primary font-bold">
                                         <Zap size={24} />
                                     </div>
-                                    <h2 className="text-4xl font-black italic text-white mb-2">RANDOM CHAT</h2>
+                                    <h2 className="text-4xl font-black italic text-primary mb-2">RANDOM CHAT</h2>
                                     <p className="text-accent-cream opacity-80 max-w-sm">
                                         Throw caution to the wind. Meet the unexpected.
                                     </p>
@@ -134,7 +133,7 @@ export default function DashboardPage() {
                                     <Lock size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-white mb-1">Private Call</h3>
+                                    <h3 className="text-xl font-bold text-primary mb-1">Private Call</h3>
                                     <p className="text-sm text-text-muted">Secure & encrypted.</p>
                                 </div>
                             </div>
@@ -149,7 +148,7 @@ export default function DashboardPage() {
                                     <Users size={20} />
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-bold text-white mb-1">Group Call</h3>
+                                    <h3 className="text-xl font-bold text-primary mb-1">Group Call</h3>
                                     <p className="text-sm text-text-muted">The more the merrier.</p>
                                 </div>
                             </div>
@@ -165,7 +164,7 @@ export default function DashboardPage() {
                                         <Radio size={24} />
                                     </div>
                                     <div>
-                                        <h3 className="text-xl font-bold text-white">Go Live</h3>
+                                        <h3 className="text-xl font-bold text-primary">Go Live</h3>
                                         <p className="text-sm text-text-muted">Broadcast yourself now.</p>
                                     </div>
                                 </div>
@@ -189,9 +188,9 @@ export default function DashboardPage() {
                             {[1, 2, 3, 4].map((i) => (
                                 <div key={i} className="flex flex-col items-center gap-2 min-w-[80px]">
                                     <div className="w-14 h-14 rounded-full bg-surface-hover border border-border p-1 relative">
-                                        <img 
-                                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`} 
-                                            alt="User" 
+                                        <img
+                                            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${i}`}
+                                            alt="User"
                                             className="w-full h-full rounded-full bg-background"
                                         />
                                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-gold rounded-full border-2 border-surface" />
@@ -204,7 +203,7 @@ export default function DashboardPage() {
                             ))}
                         </div>
                     </section>
-                    
+
                     {/* Recent Activity */}
                     <section className="bg-surface rounded-3xl p-6 border border-border">
                         <h3 className="font-bold text-text-secondary mb-4 flex items-center gap-2">

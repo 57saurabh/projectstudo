@@ -46,7 +46,7 @@ export default function AuthPage() {
             <div className="relative z-10 w-full max-w-md flex flex-col items-center px-4 sm:px-0">
                 {/* Logo */}
                 <div className="mb-8 flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gold rounded-full flex items-center justify-center text-white font-black text-2xl shadow-gold-glow">Z</div>
+                    <div className="w-12 h-12 bg-gold rounded-full flex items-center justify-center text-primary font-black text-2xl shadow-gold-glow">Z</div>
                     <h1 className="text-4xl font-black text-text-primary tracking-tighter">Zylo</h1>
                 </div>
 
@@ -57,13 +57,13 @@ export default function AuthPage() {
                     <div className="flex bg-surface-hover p-1.5 rounded-2xl mb-8 border border-border">
                         <button
                             onClick={() => setIsLogin(true)}
-                            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${isLogin ? 'bg-gold text-white shadow-gold-glow' : 'text-text-muted hover:text-text-primary'}`}
+                            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${isLogin ? 'bg-gold text-primary shadow-gold-glow' : 'text-text-muted hover:text-text-primary'}`}
                         >
                             Login
                         </button>
                         <button
                             onClick={() => setIsLogin(false)}
-                            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${!isLogin ? 'bg-gold text-white shadow-gold-glow' : 'text-text-muted hover:text-text-primary'}`}
+                            className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${!isLogin ? 'bg-gold text-primary shadow-gold-glow' : 'text-text-muted hover:text-text-primary'}`}
                         >
                             Sign Up
                         </button>
@@ -124,7 +124,7 @@ export default function AuthPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-gold hover:bg-gold-hover text-white font-black py-4 rounded-2xl shadow-gold-glow transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed mt-8 uppercase tracking-wide"
+                            className="w-full bg-gold hover:bg-gold-hover text-primary font-black py-4 rounded-2xl shadow-gold-glow transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed mt-8 uppercase tracking-wide"
                         >
                             {loading ? 'Loading...' : (isLogin ? 'Login to Zylo' : 'Join Zylo')}
                         </button>

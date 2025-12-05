@@ -14,7 +14,7 @@ export default function Header() {
     const router = useRouter();
     const dispatch = useDispatch();
     const { user } = useSelector((state: RootState) => state.auth);
-    
+
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -53,11 +53,11 @@ export default function Header() {
         <motion.header
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="flex items-center justify-between px-4 py-3 mx-2 mt-2 lg:px-8 lg:py-4 lg:mx-4 lg:mt-4 mb-0 bg-surface/90 backdrop-blur-xl border border-border rounded-3xl shadow-lg z-30 sticky top-2 lg:top-4 transition-colors duration-300"
+            className="flex items-center justify-between px-4 py-3 mx-2 mt-2 lg:px-8 lg:py-4 lg:mx-4 lg:mt-4 mb-0 bg-surface/80 backdrop-blur-xl border border-border rounded-3xl shadow-lg z-30 sticky top-2 lg:top-4 transition-colors duration-300"
         >
             {/* Left: Title / Breadcrumbs */}
             <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-black tracking-tight text-white">
+                <h1 className="text-2xl font-black tracking-tight text-primary">
                     {title}
                 </h1>
             </div>
@@ -92,7 +92,7 @@ export default function Header() {
 
                 {/* User Profile Dropdown */}
                 <div className="relative" ref={dropdownRef}>
-                    <button 
+                    <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                         className="flex items-center gap-3 pl-2 group outline-none"
                     >
@@ -134,7 +134,7 @@ export default function Header() {
                                     <p className="font-bold text-lg text-text-primary">{user?.displayName || 'Guest'}</p>
                                     <p className="text-xs text-text-muted font-medium truncate">{user?.email || 'No email'}</p>
                                 </div>
-                                
+
                                 <div className="p-3 space-y-1">
                                     <Link href="/settings/profile" onClick={() => setIsDropdownOpen(false)}>
                                         <div className="flex items-center gap-4 px-4 py-3 rounded-2xl hover:bg-surface-hover text-text-primary transition-colors cursor-pointer group">
@@ -155,7 +155,7 @@ export default function Header() {
                                 </div>
 
                                 <div className="p-3 border-t border-border mt-1">
-                                    <button 
+                                    <button
                                         onClick={handleLogout}
                                         className="flex items-center gap-4 px-4 py-3 w-full rounded-2xl hover:bg-danger/10 text-danger transition-colors group"
                                     >

@@ -35,7 +35,7 @@ export default function PreCheckPage() {
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [isCapturing, setIsCapturing] = useState(false);
-    
+
     // Form State
     const [formData, setFormData] = useState({
         displayName: '',
@@ -47,7 +47,7 @@ export default function PreCheckPage() {
         languages: [] as string[],
         languageCountries: [] as string[]
     });
-    
+
     // Custom Input State
     const [customInterest, setCustomInterest] = useState('');
     const [universitySearch, setUniversitySearch] = useState('');
@@ -221,7 +221,7 @@ export default function PreCheckPage() {
     };
 
     if (loading) return (
-        <div className="flex min-h-screen items-center justify-center bg-background text-white">
+        <div className="flex min-h-screen items-center justify-center bg-background text-primary">
             <div className="flex flex-col items-center gap-4">
                 <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin" />
                 <p className="text-xl font-bold text-gold animate-pulse">Loading Profile...</p>
@@ -243,13 +243,12 @@ export default function PreCheckPage() {
             {/* Left Side: Camera Check */}
             <div className="w-full max-w-xl flex flex-col gap-6 z-10">
                 <div className="text-center lg:text-left">
-                    <h1 className="text-4xl font-black text-white mb-2 tracking-tighter">Camera Check</h1>
+                    <h1 className="text-4xl font-black text-primary mb-2 tracking-tighter">Camera Check</h1>
                     <p className="text-text-muted font-medium">Wait for verifying your face...</p>
                 </div>
 
-                <div className={`relative aspect-[4/3] w-full bg-surface rounded-3xl overflow-hidden border-4 transition-colors duration-500 shadow-2xl ${
-                    faceDetected ? 'border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.2)]' : 'border-gold shadow-gold-glow'
-                }`}>
+                <div className={`relative aspect-[4/3] w-full bg-surface rounded-3xl overflow-hidden border-4 transition-colors duration-500 shadow-2xl ${faceDetected ? 'border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.2)]' : 'border-gold shadow-gold-glow'
+                    }`}>
                     <LocalVideo />
 
                     {/* Scanning Overlay */}
@@ -272,11 +271,10 @@ export default function PreCheckPage() {
                     </div>
 
                     {/* Status Badge */}
-                    <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl backdrop-blur-xl border flex items-center gap-3 transition-all duration-300 shadow-lg ${
-                        faceDetected 
-                        ? 'bg-green-500/20 border-green-500/50 text-green-400' 
+                    <div className={`absolute bottom-6 left-1/2 -translate-x-1/2 px-6 py-3 rounded-2xl backdrop-blur-xl border flex items-center gap-3 transition-all duration-300 shadow-lg ${faceDetected
+                        ? 'bg-green-500/20 border-green-500/50 text-green-400'
                         : 'bg-black/60 border-white/10 text-white/70'
-                    }`}>
+                        }`}>
                         {faceDetected ? (
                             <>
                                 <CheckCircle size={20} className="text-green-400" />
@@ -304,13 +302,13 @@ export default function PreCheckPage() {
             </div>
 
             {/* Right Side: Profile Details */}
-            <div className="w-full max-w-md bg-surface/90 backdrop-blur-xl border border-border rounded-3xl p-8 flex flex-col gap-6 max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl z-10 ring-1 ring-gold/5">
+            <div className="w-full max-w-md bg-surface/80 backdrop-blur-xl border border-border rounded-3xl p-8 flex flex-col gap-6 max-h-[85vh] overflow-y-auto custom-scrollbar shadow-2xl z-10 ring-1 ring-gold/5">
                 <div className="flex items-center justify-between sticky top-0 bg-surface/95 backdrop-blur-xl z-20 py-4 -mx-4 px-4 border-b border-border/50">
-                    <h2 className="text-2xl font-black text-white italic tracking-tighter">YOUR PROFILE</h2>
+                    <h2 className="text-2xl font-black text-primary italic tracking-tighter">YOUR PROFILE</h2>
                     {!isEditing ? (
                         <button
                             onClick={() => setIsEditing(true)}
-                            className="text-gold hover:text-white font-bold transition-colors bg-gold/10 hover:bg-gold px-4 py-2 rounded-xl"
+                            className="text-gold hover:text-primary font-bold transition-colors bg-gold/10 hover:bg-gold px-4 py-2 rounded-xl"
                         >
                             Edit
                         </button>
@@ -318,7 +316,7 @@ export default function PreCheckPage() {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setIsEditing(false)}
-                                className="text-text-muted hover:text-white text-sm font-bold bg-surface-hover px-4 py-2 rounded-xl transition-colors"
+                                className="text-text-muted hover:text-primary text-sm font-bold bg-surface-hover px-4 py-2 rounded-xl transition-colors"
                             >
                                 Cancel
                             </button>
@@ -341,8 +339,8 @@ export default function PreCheckPage() {
                                 className="w-full h-full object-cover"
                             />
                         </div>
-                        <div className="absolute inset-0 bg-black/60 rounded-[2rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 rotate-3 group-hover:rotate-0 backdrop-blur-[2px]">
-                            <span className="text-gold font-bold uppercase tracking-widest text-sm border-2 border-gold px-3 py-1 rounded-lg">Change</span>
+                        <div className="absolute inset-0 bg-black/40 rounded-[2rem] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 rotate-3 group-hover:rotate-0 backdrop-blur-sm">
+                            <span className="text-white font-bold uppercase tracking-widest text-xs bg-gold/90 px-4 py-2 rounded-xl shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">Change Photo</span>
                         </div>
                     </div>
 
@@ -354,7 +352,7 @@ export default function PreCheckPage() {
                                 value={isEditing ? formData.displayName : (user?.displayName || user?.username)}
                                 onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
                                 disabled={!isEditing}
-                                className={!isEditing ? "border-transparent bg-transparent pl-0 text-xl text-center font-black text-white pointer-events-none shadow-none" : ""}
+                                className={!isEditing ? "border-transparent bg-transparent pl-0 text-xl text-center font-black text-primary pointer-events-none shadow-none" : ""}
                                 containerClassName={!isEditing ? "items-center text-center" : ""}
                                 placeholder="Your Name"
                             />
@@ -365,7 +363,7 @@ export default function PreCheckPage() {
                                     <textarea
                                         value={formData.bio}
                                         onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                                        className="w-full bg-surface-hover/50 border border-border rounded-2xl p-4 text-text-primary text-sm focus:border-gold outline-none resize-none h-24 font-medium"
+                                        className="w-full bg-surface-hover/50 border border-border rounded-2xl p-4 text-text-primary text-sm focus:border-gold focus:ring-2 focus:ring-gold/20 outline-none resize-none h-28 font-medium transition-all shadow-inner"
                                         placeholder="Tell us about yourself..."
                                     />
                                 </div>
@@ -388,28 +386,27 @@ export default function PreCheckPage() {
                                         <select
                                             value={formData.country}
                                             onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                                            className="w-full bg-surface-hover/50 border border-border rounded-xl px-4 py-3 text-text-primary text-sm focus:border-gold outline-none font-bold"
+                                            className="w-full bg-surface-hover/50 border border-border rounded-xl px-4 py-3 text-text-primary text-sm focus:border-gold focus:ring-2 focus:ring-gold/20 outline-none font-bold transition-all"
                                         >
                                             <option value="" className="bg-surface">Select Country</option>
                                             {COUNTRIES.map(c => (
                                                 <option key={c} value={c} className="bg-surface">{c}</option>
                                             ))}
                                         </select>
-                                        
+
                                         <div className="bg-surface-hover/30 border border-border rounded-xl p-3 max-h-40 overflow-y-auto custom-scrollbar">
                                             <p className="text-[10px] text-text-muted uppercase font-bold mb-2">Region Preference</p>
                                             <div className="grid grid-cols-2 gap-2">
                                                 {COUNTRIES.filter(c => c !== 'Pakistan').map(c => {
                                                     const isSelected = (Array.isArray(formData.region) ? formData.region : []).includes(c);
                                                     return (
-                                                        <div 
+                                                        <div
                                                             key={c}
                                                             onClick={() => toggleRegion(c)}
-                                                            className={`cursor-pointer px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-between border ${
-                                                                isSelected 
-                                                                ? 'bg-gold/10 border-gold/50 text-gold shadow-sm' 
+                                                            className={`cursor-pointer px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-between border ${isSelected
+                                                                ? 'bg-gold/10 border-gold/50 text-gold shadow-sm'
                                                                 : 'bg-surface border-transparent hover:bg-surface-hover text-text-secondary'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             <span className="truncate">{c}</span>
                                                             {isSelected && <CheckCircle size={12} />}
@@ -423,7 +420,7 @@ export default function PreCheckPage() {
                                     <div className="bg-surface-hover/30 border border-border rounded-2xl p-4 flex flex-col gap-3">
                                         <div className="flex justify-between items-center">
                                             <span className="text-text-muted text-xs font-bold uppercase">Country</span>
-                                            <span className="text-white font-bold text-sm">{user?.country || "Not set"}</span>
+                                            <span className="text-primary font-bold text-sm">{user?.country || "Not set"}</span>
                                         </div>
                                         <div className="flex justify-between items-start">
                                             <span className="text-text-muted text-xs font-bold uppercase mt-1">Regions</span>
@@ -448,7 +445,7 @@ export default function PreCheckPage() {
                                 </label>
                                 {isEditing ? (
                                     <div className="relative">
-                                        <Input 
+                                        <Input
                                             value={universitySearch}
                                             onChange={(e) => {
                                                 setUniversitySearch(e.target.value);
@@ -497,9 +494,9 @@ export default function PreCheckPage() {
                                     <div className="space-y-3">
                                         <div className="flex flex-wrap gap-2 min-h-[40px] p-2 bg-surface-hover/30 rounded-xl border border-border">
                                             {(formData.interests || []).map(interest => (
-                                                <span key={interest} className="px-2 py-1 rounded-full bg-gold/10 text-gold border border-gold/20 text-xs font-bold flex items-center gap-1 shadow-sm">
+                                                <span key={interest} className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-gold/10 to-orange/10 text-gold border border-gold/20 text-xs font-bold flex items-center gap-2 shadow-sm hover:shadow-md transition-all">
                                                     {interest}
-                                                    <button onClick={() => removeInterest(interest)} className="hover:text-white transition-colors"><X size={12} /></button>
+                                                    <button onClick={() => removeInterest(interest)} className="hover:text-danger hover:bg-danger/10 rounded-full p-0.5 transition-colors"><X size={12} /></button>
                                                 </span>
                                             ))}
                                             {(formData.interests || []).length === 0 && <span className="text-text-muted text-xs p-1">No interests added</span>}
@@ -515,7 +512,7 @@ export default function PreCheckPage() {
                                                         addInterest(customInterest);
                                                     }
                                                 }}
-                                                className="flex-1 bg-surface-hover/50 border border-border rounded-xl px-4 py-2.5 text-text-primary text-sm focus:border-gold outline-none font-medium"
+                                                className="flex-1 bg-surface-hover/50 border border-border rounded-xl px-4 py-2.5 text-text-primary text-sm focus:border-gold focus:ring-2 focus:ring-gold/20 outline-none font-medium transition-all"
                                                 placeholder="Add interest..."
                                             />
                                             <button onClick={() => addInterest(customInterest)} className="px-4 py-2 bg-gradient-to-r from-gold to-orange rounded-xl font-bold text-sm text-white shadow-gold-glow hover:shadow-lg transition-all">Add</button>

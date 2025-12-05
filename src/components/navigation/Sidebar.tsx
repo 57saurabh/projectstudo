@@ -80,7 +80,7 @@ export default function Sidebar() {
                         <motion.div
                             whileHover={{ scale: 1.05, rotate: 5 }}
                             whileTap={{ scale: 0.95 }}
-                            className="w-14 h-14 bg-gold rounded-2xl flex items-center justify-center font-black text-2xl text-white flex-shrink-0 shadow-gold-glow cursor-pointer"
+                            className="w-14 h-14 bg-gold rounded-2xl flex items-center justify-center font-black text-2xl text-primary flex-shrink-0 shadow-gold-glow cursor-pointer"
                         >
                             Z
                         </motion.div>
@@ -126,7 +126,7 @@ export default function Sidebar() {
                                     whileTap={{ scale: 0.98 }}
                                     className={`flex items-center rounded-2xl transition-all relative z-10 ${isOpen ? 'px-5 py-4' : 'justify-center py-4'
                                         } ${isActive
-                                            ? 'text-white shadow-gold-glow'
+                                            ? 'text-primary shadow-gold-glow'
                                             : 'text-text-secondary hover:text-text-primary'
                                         }`}
                                 >
@@ -148,7 +148,7 @@ export default function Sidebar() {
                                     <div className="flex items-center gap-5 relative z-10">
                                         <item.icon
                                             size={26}
-                                            className={`flex-shrink-0 transition-colors ${isActive ? 'text-white' : ''}`}
+                                            className={`flex-shrink-0 transition-colors ${isActive ? 'text-primary' : ''}`}
                                         />
                                         <AnimatePresence>
                                             {isOpen && (
@@ -197,7 +197,7 @@ export default function Sidebar() {
             >
                 <div className="h-28 flex items-center px-8 justify-between bg-surface-hover/50">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gold rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-gold-glow">
+                        <div className="w-12 h-12 bg-gold rounded-2xl flex items-center justify-center font-black text-xl text-primary shadow-gold-glow">
                             Z
                         </div>
                         <span className="font-black text-2xl text-text-primary tracking-tighter">Zylo</span>
@@ -219,8 +219,8 @@ export default function Sidebar() {
                                 href={item.href}
                                 onClick={closeSidebar}
                                 className={`flex items-center px-5 py-4 rounded-2xl transition-all ${isActive
-                                        ? 'bg-gold text-white shadow-gold-glow'
-                                        : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
+                                    ? 'bg-gold text-primary shadow-gold-glow'
+                                    : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
                                     }`}
                             >
                                 <item.icon size={26} />

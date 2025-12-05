@@ -40,13 +40,12 @@ export default function ChatArea({
                         )}
                         <div className={`flex flex-col gap-1 ${msg.senderId === user?.id ? 'items-end' : 'items-start'} ${msg.isSystem ? 'w-full items-center' : ''}`}>
                             {!msg.isSystem && <p className="text-text-muted text-[13px] font-medium">{msg.senderName}</p>}
-                            <div className={`max-w-[240px] rounded-2xl px-4 py-2 text-sm font-medium ${
-                                msg.isSystem 
-                                ? 'bg-surface-hover text-text-muted text-xs text-center italic' 
-                                : (msg.senderId === user?.id 
-                                    ? 'bg-gold text-white shadow-gold-glow' 
-                                    : 'bg-accent-cream text-background')
-                            }`}>
+                            <div className={`max-w-[240px] rounded-2xl px-4 py-2 text-sm font-medium ${msg.isSystem
+                                    ? 'bg-surface-hover text-text-muted text-xs text-center italic'
+                                    : (msg.senderId === user?.id
+                                        ? 'bg-gold text-primary shadow-gold-glow'
+                                        : 'bg-accent-cream text-black')
+                                }`}>
                                 {msg.text}
                             </div>
                         </div>

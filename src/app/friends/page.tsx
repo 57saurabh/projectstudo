@@ -119,7 +119,7 @@ export default function FriendsPage() {
                         <h1 className="text-3xl font-bold tracking-tight">Friends</h1>
                         <p className="text-text-secondary">Manage your connections</p>
                     </div>
-                    <button className="flex items-center gap-2 px-6 py-3 bg-gold text-white rounded-2xl font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95">
+                    <button className="flex items-center gap-2 px-6 py-3 bg-gold text-primary rounded-2xl font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95">
                         <UserPlus size={20} />
                         Add Friend
                     </button>
@@ -174,7 +174,7 @@ export default function FriendsPage() {
                                 key={tab}
                                 onClick={() => setActiveTab(tab as any)}
                                 className={`px-6 py-2.5 rounded-xl text-sm font-bold capitalize transition-all ${activeTab === tab
-                                    ? 'bg-gold text-white shadow-gold-glow'
+                                    ? 'bg-gold text-primary shadow-gold-glow'
                                     : 'text-text-secondary hover:text-text-primary hover:bg-background'
                                     }`}
                             >
@@ -215,7 +215,7 @@ export default function FriendsPage() {
                                         <div className="flex gap-2 mt-4">
                                             <button
                                                 onClick={() => handleRequestAction(req._id, 'accept')}
-                                                className="flex-1 bg-gold text-white py-2.5 rounded-xl font-bold hover:bg-gold-hover hover:shadow-gold-glow transition-all flex items-center justify-center gap-2"
+                                                className="flex-1 bg-gold text-primary py-2.5 rounded-xl font-bold hover:bg-gold-hover hover:shadow-gold-glow transition-all flex items-center justify-center gap-2"
                                             >
                                                 <Check size={18} /> Accept
                                             </button>
@@ -288,7 +288,7 @@ export default function FriendsPage() {
                                         </button>
                                         <button
                                             onClick={() => router.push(`/call/private?userId=${friend._id}`)}
-                                            className="flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-orange text-white font-bold hover:bg-orange-hover hover:shadow-orange-glow transition-all duration-300"
+                                            className="flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-orange text-primary font-bold hover:bg-orange-hover hover:shadow-orange-glow transition-all duration-300"
                                         >
                                             <Video size={18} />
                                             <span>Call</span>

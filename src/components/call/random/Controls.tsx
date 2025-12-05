@@ -27,15 +27,15 @@ export default function Controls({
     onAddRandomUser
 }: ControlsProps) {
     const buttonBase = "p-3 md:p-4 rounded-full transition-all duration-200 flex items-center justify-center";
-    const ghostButton = `${buttonBase} bg-surface-hover text-text-secondary hover:text-white hover:bg-surface border border-border hover:border-gold/30`;
+    const ghostButton = `${buttonBase} bg-surface-hover text-text-secondary hover:text-primary hover:bg-surface border border-border hover:border-gold/30`;
     const dangerButton = `${buttonBase} bg-danger text-white hover:bg-danger-hover shadow-danger-glow`;
-    const goldButton = `${buttonBase} bg-gold text-white hover:bg-gold-hover shadow-gold-glow`;
-    const orangeButton = `${buttonBase} bg-orange text-white hover:bg-orange-hover shadow-orange-glow`;
+    const goldButton = `${buttonBase} bg-gold text-primary hover:bg-gold-hover shadow-gold-glow`;
+    const orangeButton = `${buttonBase} bg-orange text-primary hover:bg-orange-hover shadow-orange-glow`;
 
     return (
         <div className="relative mb-6 flex justify-center z-10 w-full px-4">
             <div className="flex flex-wrap justify-center items-center gap-3 md:gap-4 p-2 rounded-full bg-surface/90 backdrop-blur-xl border border-border shadow-2xl">
-                
+
                 {/* Mic */}
                 <button
                     onClick={toggleMic}
@@ -87,8 +87,8 @@ export default function Controls({
 
                 <div className="w-px h-8 bg-border mx-1"></div>
 
-                 {/* End Call */}
-                 <Link href="/dashboard">
+                {/* End Call */}
+                <Link href="/dashboard">
                     <button className={dangerButton}>
                         <PhoneOff size={20} />
                     </button>
