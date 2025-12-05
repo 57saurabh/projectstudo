@@ -151,9 +151,9 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onCancel }) =>
                         />
                         {/* Countdown Overlay */}
                         {countdown !== null && (
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-sm z-10">
-                                <span className="text-[150px] font-bold text-white drop-shadow-lg animate-pulse">
-                                    {countdown === 0 ? 'Smile!' : countdown}
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-sm z-10 transition-all duration-300">
+                                <span className="text-[180px] font-black text-gold drop-shadow-[0_0_50px_rgba(255,215,0,0.5)] animate-bounce">
+                                    {countdown === 0 ? '😊' : countdown}
                                 </span>
                             </div>
                         )}
@@ -168,38 +168,38 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onCancel }) =>
 
                 {error && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/80 text-white p-4">
-                        <p className="text-xl text-red-400">{error}</p>
+                        <p className="text-xl font-bold text-danger bg-danger/10 px-6 py-4 rounded-3xl border border-danger/30">{error}</p>
                     </div>
                 )}
 
                 {/* Controls Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black/80 to-transparent flex flex-col items-center gap-6">
+                <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-black via-black/50 to-transparent flex flex-col items-center gap-8">
 
                     {!capturedImage && countdown === null && (
-                        <div className="flex items-center gap-4 bg-black/40 backdrop-blur-md px-6 py-3 rounded-full border border-white/10">
-                            <span className="text-white font-medium">Timer:</span>
+                        <div className="flex items-center gap-4 bg-black/60 backdrop-blur-xl px-8 py-3 rounded-full border border-white/10 shadow-lg">
+                            <span className="text-white font-bold uppercase tracking-wider text-sm">Timer:</span>
                             <button
                                 onClick={() => adjustTimer(-1)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-gold hover:text-white text-white/80 transition-all active:scale-95"
                             >
                                 -
                             </button>
-                            <span className="text-xl font-bold text-[#7f19e6] w-8 text-center">{timer}s</span>
+                            <span className="text-2xl font-black text-gold w-12 text-center">{timer}s</span>
                             <button
                                 onClick={() => adjustTimer(1)}
-                                className="w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+                                className="w-10 h-10 flex items-center justify-center rounded-full bg-white/10 hover:bg-gold hover:text-white text-white/80 transition-all active:scale-95"
                             >
                                 +
                             </button>
                         </div>
                     )}
 
-                    <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-10">
                         {!capturedImage ? (
                             <>
                                 <button
                                     onClick={onCancel}
-                                    className="p-4 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-md"
+                                    className="p-5 rounded-full bg-white/10 text-white hover:bg-white/20 hover:text-danger transition-all backdrop-blur-md active:scale-95 border border-white/5 hover:border-danger/30"
                                     title="Cancel"
                                 >
                                     <X size={32} />
@@ -207,27 +207,27 @@ const WebcamCapture: React.FC<WebcamCaptureProps> = ({ onCapture, onCancel }) =>
                                 <button
                                     onClick={startCaptureFlow}
                                     disabled={countdown !== null}
-                                    className={`p-6 rounded-full bg-[#7f19e6] text-white hover:bg-[#6d14c4] transition-all shadow-xl shadow-[#7f19e6]/30 transform hover:scale-105 ${countdown !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    className={`p-8 rounded-full bg-gold text-white hover:bg-gold-hover transition-all shadow-[0_0_30px_rgba(255,215,0,0.4)] hover:shadow-[0_0_50px_rgba(255,215,0,0.6)] transform hover:scale-110 active:scale-95 border-4 border-white/20 ${countdown !== null ? 'opacity-50 cursor-not-allowed contrast-50' : ''}`}
                                     title="Capture Photo"
                                 >
-                                    <Camera size={40} />
+                                    <Camera size={48} fill="currentColor" />
                                 </button>
-                                <div className="w-[64px]" /> {/* Spacer for balance */}
+                                <div className="w-[72px]" /> {/* Spacer for balance */}
                             </>
                         ) : (
                             <>
                                 <button
                                     onClick={retake}
-                                    className="flex items-center gap-2 px-6 py-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors backdrop-blur-md font-medium"
+                                    className="flex items-center gap-3 px-8 py-4 rounded-2xl bg-white/10 text-white hover:bg-white/20 transition-all backdrop-blur-md font-bold text-lg hover:scale-105 active:scale-95 border border-white/10"
                                 >
-                                    <RefreshCw size={20} />
+                                    <RefreshCw size={24} />
                                     Retake
                                 </button>
                                 <button
                                     onClick={confirm}
-                                    className="flex items-center gap-2 px-8 py-3 rounded-full bg-green-500 text-white hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20 font-bold text-lg"
+                                    className="flex items-center gap-3 px-10 py-4 rounded-2xl bg-gold text-white hover:bg-gold-hover transition-all shadow-[0_0_30px_rgba(255,215,0,0.3)] hover:shadow-[0_0_40px_rgba(255,215,0,0.5)] font-black text-xl hover:scale-105 active:scale-95"
                                 >
-                                    <Check size={24} />
+                                    <Check size={28} />
                                     Use Photo
                                 </button>
                             </>

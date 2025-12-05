@@ -12,6 +12,7 @@ import { setUser } from '@/lib/store/authSlice';
 import { COUNTRIES, LANGUAGES, INTERESTS_LIST, UNIVERSITIES_LIST, COUNTRY_LANGUAGES_MAPPING, LANGUAGE_FLAGS } from '@/lib/constants';
 import Image from 'next/image';
 import MultiSelectDropdown from '@/components/ui/MultiSelectDropdown';
+import Input from '@/components/ui/Input';
 
 export default function ProfilePage() {
     const { user, token } = useSelector((state: RootState) => state.auth);
@@ -124,18 +125,18 @@ export default function ProfilePage() {
 
     // --- Language Logic ---
     const toggleLanguageCountry = (countryName: string) => {
-        const currentCountries = formData.languageCountries || [];
+        const currentCountries = formData.preferences?.languageCountries || [];
         let newCountries;
         
         if (currentCountries.includes(countryName)) {
-            newCountries = currentCountries.filter(c => c !== countryName);
+            newCountries = currentCountries.filter((c: string) => c !== countryName);
         } else {
             newCountries = [...currentCountries, countryName];
         }
 
         // Re-calculate languages based on selected countries
         const allLanguages = new Set<string>();
-        newCountries.forEach(c => {
+        newCountries.forEach((c: string) => {
             const mapping = COUNTRY_LANGUAGES_MAPPING[c];
             if (mapping) {
                 mapping.languages.forEach(l => allLanguages.add(l));
@@ -144,8 +145,11 @@ export default function ProfilePage() {
 
         setFormData(prev => ({
             ...prev,
-            languageCountries: newCountries,
-            languages: Array.from(allLanguages)
+            preferences: {
+                ...prev.preferences,
+                languageCountries: newCountries,
+                languages: Array.from(allLanguages)
+            }
         }));
     };
 
@@ -255,33 +259,36 @@ export default function ProfilePage() {
     return (
         <div className="relative min-h-screen bg-background text-text-primary p-4 md:p-8 transition-colors duration-300">
             <div className="max-w-4xl mx-auto">
-                <Link href="/settings" className="inline-flex items-center gap-2 text-text-secondary hover:text-primary transition-colors mb-6">
-                    <ArrowLeft size={20} />
+                <Link href="/settings" className="inline-flex items-center gap-2 text-text-secondary hover:text-gold transition-colors mb-6 font-bold group">
+                    <div className="p-2 rounded-xl bg-surface border border-border group-hover:border-gold/50 group-hover:text-gold transition-colors">
+                        <ArrowLeft size={20} />
+                    </div>
                     <span>Back to Settings</span>
                 </Link>
-                <h1 className="text-3xl font-bold mb-8">Edit Profile</h1>
+                <h1 className="text-4xl font-black tracking-tighter mb-8 text-white">Edit Profile</h1>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                     {/* Left Column: Avatar */}
                     <div className="flex flex-col items-center gap-6">
-                        <div className="relative w-48 h-48 rounded-full overflow-hidden border-4 border-primary bg-black/50 group">
+                        <div className="relative w-48 h-48 rounded-3xl overflow-hidden border-4 border-gold bg-surface group shadow-gold-glow">
                             {formData.avatarUrl ? (
                                 <img src={formData.avatarUrl} alt="Profile" className="w-full h-full object-cover" />
                             ) : (
-                                <div className="w-full h-full flex items-center justify-center text-text-secondary">
+                                <div className="w-full h-full flex items-center justify-center text-gold">
                                     <UserIcon size={64} />
                                 </div>
                             )}
 
-                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onClick={() => setIsCapturing(true)}>
-                                <Camera className="text-white" size={32} />
+                            <div className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-sm" onClick={() => setIsCapturing(true)}>
+                                <Camera className="text-gold dropshadow-lg" size={40} />
                             </div>
                         </div>
 
                         <button
                             onClick={() => setIsCapturing(true)}
-                            className="text-primary font-medium hover:text-primary/80 transition-colors"
+                            className="text-gold font-bold hover:text-gold-hover transition-colors flex items-center gap-2"
                         >
+                            <Camera size={18} />
                             Change Profile Photo
                         </button>
 
@@ -295,130 +302,127 @@ export default function ProfilePage() {
 
                     {/* Right Column: Form */}
                     <div className="md:col-span-2">
-                        {/* DEBUG: Temporary display of form data */}
-                        <div className="bg-black/50 p-2 text-xs font-mono text-green-400 mb-4 overflow-auto max-h-40 rounded">
+                        {/* DEBUG: Temporary display of form data - Commented out for production feel */}
+                        {/* <div className="bg-black/50 p-2 text-xs font-mono text-green-400 mb-4 overflow-auto max-h-40 rounded">
                             DEBUG STATE:
                             {JSON.stringify({ 
                                 profession: formData.profession,
                                 preferences: formData.preferences,
                                 universitySearch
                             }, null, 2)}
-                        </div>
+                        </div> */}
                         <form onSubmit={handleSubmit} className="space-y-6">
                             {message && (
-                                <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                <div className={`p-4 rounded-2xl font-bold border ${message.type === 'success' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-danger/10 text-danger border-danger/20'}`}>
                                     {message.text}
                                 </div>
                             )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 {/* Basic Info */}
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-text-secondary">Display Name</label>
-                                    <div className="relative">
-                                        <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
-                                        <input
-                                           disabled={!isEditing} 
-                                            type="text"
-                                            name="displayName"
-                                            value={formData.displayName || ''}
-                                            onChange={handleInputChange}
-                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
-                                            placeholder="Your Name"
-                                        />
-                                    </div>
-                                </div>
+                                {/* Basic Info */}
+                                <Input
+                                    label="Display Name"
+                                    icon={UserIcon}
+                                    disabled={!isEditing}
+                                    type="text"
+                                    name="displayName"
+                                    value={formData.displayName || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="Your Name"
+                                />
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-text-secondary">Username</label>
-                                    <div className="relative">
-                                        <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
-                                        <input
-                                             disabled={!isEditing}
-                                            type="text"
-                                            name="username"
-                                            value={formData.username || ''}
-                                            onChange={handleInputChange}
-                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
-                                            placeholder="username"
-                                        />
-                                    </div>
-                                </div>
+                                <Input
+                                    label="Username"
+                                    icon={Hash}
+                                    disabled={!isEditing}
+                                    type="text"
+                                    name="username"
+                                    value={formData.username || ''}
+                                    onChange={handleInputChange}
+                                    placeholder="username"
+                                />
 
                                 {/* Profession */}
-                                <div className="space-y-4 border-t border-glass-border pt-4 mt-4">
-                                    <h3 className="text-lg font-semibold text-text-primary">Profession & Work</h3>
+                                <div className="space-y-6 border-t border-border pt-6 mt-4 md:col-span-2">
+                                    <h3 className="text-xl font-black text-white flex items-center gap-2">
+                                        <Briefcase className="text-gold" size={24} />
+                                        Profession & Work
+                                    </h3>
                                     
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium text-text-secondary">Current Role</label>
-                                        <div className="relative">
-                                            <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
-                                            <select
-                                                disabled={!isEditing}
-                                                name="professionType"
-                                                value={(formData.profession as any)?.type || ''}
-                                                onChange={handleInputChange}
-                                                className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none"
-                                            >
-                                                <option value="" className="bg-surface">Select Profession</option>
-                                                {PROFESSION_TYPES.map(p => (
-                                                    <option key={p} value={p} className="bg-surface text-black">{p}</option>
-                                                ))}
-                                            </select>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-bold text-text-muted uppercase tracking-wider">Current Role</label>
+                                            <div className="relative">
+                                                <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted icon-gold-focus" size={18} />
+                                                <select
+                                                    disabled={!isEditing}
+                                                    name="professionType"
+                                                    value={(formData.profession as any)?.type || ''}
+                                                    onChange={handleInputChange}
+                                                    className="w-full bg-surface-hover/50 border border-border rounded-2xl pl-12 pr-4 py-3.5 text-text-primary focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all font-medium appearance-none disabled:opacity-60 disabled:cursor-not-allowed focus:bg-surface-hover"
+                                                >
+                                                    <option value="" className="bg-surface text-text-muted">Select Profession</option>
+                                                    {PROFESSION_TYPES.map(p => (
+                                                        <option key={p} value={p} className="bg-surface text-text-primary">{p}</option>
+                                                    ))}
+                                                </select>
+                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted">
+                                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                        <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                                    </svg>
+                                                </div>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    {/* Conditional Fields based on Profession Type */}
-                                    {(() => {
-                                        const type = (formData.profession as any)?.type;
-                                        if (!type) return null;
+                                        {/* Conditional Fields based on Profession Type */}
+                                        {(() => {
+                                            const type = (formData.profession as any)?.type;
+                                            if (!type) return null;
 
-                                        // 1. University for Students
-                                        if (type === 'Student' || type === 'Medical Student') {
-                                            return (
-                                                <div className="space-y-2 relative">
-                                                    <label className="text-sm font-medium text-text-secondary">University / College</label>
+                                            // 1. University for Students
+                                            if (type === 'Student' || type === 'Medical Student') {
+                                                return (
                                                     <div className="relative">
-                                                        <Briefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
-                                                        <input
+                                                        <Input
+                                                            label="University / College"
+                                                            icon={Briefcase}
                                                             disabled={!isEditing}
                                                             type="text"
                                                             value={universitySearch}
                                                             onChange={handleUniversityChange}
                                                             onFocus={() => setShowUniSuggestions(true)}
                                                             onBlur={handleUniversityBlur}
-                                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                                                             placeholder="Search University..."
                                                         />
+                                                        {showUniSuggestions && universitySearch && (
+                                                            <div className="absolute z-50 w-full bg-surface border border-border rounded-xl mt-1 max-h-60 overflow-y-auto shadow-2xl custom-scrollbar ring-1 ring-gold/10">
+                                                                {filteredUniversities.length > 0 ? (
+                                                                    filteredUniversities.map(uni => (
+                                                                        <div
+                                                                            key={uni}
+                                                                            className="px-4 py-3 hover:bg-surface-hover cursor-pointer text-sm font-medium border-b border-border/50 last:border-0"
+                                                                            onClick={() => selectUniversity(uni)}
+                                                                        >
+                                                                            {uni}
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <div className="px-4 py-3 text-text-muted text-sm font-medium">No matches found</div>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                    {showUniSuggestions && universitySearch && (
-                                                        <div className="absolute z-10 w-full bg-surface border border-glass-border rounded-lg mt-1 max-h-60 overflow-y-auto shadow-xl custom-scrollbar">
-                                                            {filteredUniversities.length > 0 ? (
-                                                                filteredUniversities.map(uni => (
-                                                                    <div
-                                                                        key={uni}
-                                                                        className="px-4 py-2 hover:bg-white/10 cursor-pointer text-sm"
-                                                                        onClick={() => selectUniversity(uni)}
-                                                                    >
-                                                                        {uni}
-                                                                    </div>
-                                                                ))
-                                                            ) : (
-                                                                <div className="px-4 py-2 text-text-secondary text-sm">No matches found</div>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        }
+                                                );
+                                            }
 
-                                        // 2. Hospital for Medical Professionals
-                                        const medicalRoles = ["Doctor", "Nurse", "Therapist", "Pharmacist", "Lab Technician"];
-                                        if (medicalRoles.includes(type)) {
-                                            return (
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-text-secondary">Hospital / Clinic</label>
-                                                    <input
+                                            // 2. Hospital for Medical Professionals
+                                            const medicalRoles = ["Doctor", "Nurse", "Therapist", "Pharmacist", "Lab Technician"];
+                                            if (medicalRoles.includes(type)) {
+                                                return (
+                                                    <Input
+                                                        label="Hospital / Clinic"
+                                                        icon={Briefcase}
                                                         disabled={!isEditing}
                                                         type="text"
                                                         name="profession.hospital"
@@ -427,29 +431,27 @@ export default function ProfilePage() {
                                                             ...prev, 
                                                             profession: { ...prev.profession, hospital: e.target.value } as any
                                                         }))}
-                                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                                                         placeholder="Hospital Name"
                                                     />
-                                                </div>
-                                            );
-                                        }
+                                                );
+                                            }
 
-                                        // 3. Company for Tech/Corporate
-                                        const corporateRoles = [
-                                            "Software Engineer", "Full-Stack Developer", "Backend Developer", "Frontend Developer",
-                                            "Mobile Developer", "Game Developer", "AI Engineer", "ML Engineer", "Data Analyst",
-                                            "Data Scientist", "Cybersecurity Analyst", "DevOps Engineer", "Cloud Engineer",
-                                            "UI/UX Designer", "Product Designer", "Graphic Designer", "Animator", "Video Editor",
-                                            "Photographer", "Videographer", "Content Creator", "Influencer", "Blogger", "Writer",
-                                            "Editor", "Architect", "Civil Engineer", "Mechanical Engineer", "Electrical Engineer",
-                                            "Technician", "Mechanic", "Marketing Specialist", "HR Executive", "Operations Manager",
-                                            "Accountant", "Banker", "Business Analyst", "Entrepreneur", "Founder", "Freelancer", "Self-Employed"
-                                        ];
-                                        if (corporateRoles.includes(type)) {
-                                            return (
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-text-secondary">Company / Organization</label>
-                                                    <input
+                                            // 3. Company for Tech/Corporate
+                                            const corporateRoles = [
+                                                "Software Engineer", "Full-Stack Developer", "Backend Developer", "Frontend Developer",
+                                                "Mobile Developer", "Game Developer", "AI Engineer", "ML Engineer", "Data Analyst",
+                                                "Data Scientist", "Cybersecurity Analyst", "DevOps Engineer", "Cloud Engineer",
+                                                "UI/UX Designer", "Product Designer", "Graphic Designer", "Animator", "Video Editor",
+                                                "Photographer", "Videographer", "Content Creator", "Influencer", "Blogger", "Writer",
+                                                "Editor", "Architect", "Civil Engineer", "Mechanical Engineer", "Electrical Engineer",
+                                                "Technician", "Mechanic", "Marketing Specialist", "HR Executive", "Operations Manager",
+                                                "Accountant", "Banker", "Business Analyst", "Entrepreneur", "Founder", "Freelancer", "Self-Employed"
+                                            ];
+                                            if (corporateRoles.includes(type)) {
+                                                return (
+                                                    <Input
+                                                        label="Company / Organization"
+                                                        icon={Briefcase}
                                                         disabled={!isEditing}
                                                         type="text"
                                                         name="profession.company"
@@ -458,29 +460,18 @@ export default function ProfilePage() {
                                                             ...prev, 
                                                             profession: { ...prev.profession, company: e.target.value } as any
                                                         }))}
-                                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                                                         placeholder="Company Name"
                                                     />
-                                                </div>
-                                            );
-                                        }
+                                                );
+                                            }
 
-                                        // 4. Occupation Place for others (fallback)
-                                        const otherRoles = ["Chef", "Cook", "Barista", "Waiter", "Customer Support", "Delivery Rider", 
-                                            "Driver", "Fitness Trainer", "Athlete", "Coach", "Model", "Social Worker", "Teacher", 
-                                            "Professor", "Researcher", "Scientist", "Sales Executive"];
-                                        
-                                        // Specific check or fallback? Prompt implies "All others -> occupationPlace"
-                                        // Let's use negative check to be safe, or just render it if not one of the above.
-                                        // The schema says occupationPlace is required if NOT university/company/hospital.
-                                        // So we should show it for anything else except Unemployed/Looking/Homemaker.
-                                        
-                                        const noWorkPlaceRoles = ["Unemployed", "Looking for Opportunities", "Homemaker"];
-                                        if (!noWorkPlaceRoles.includes(type)) {
-                                            return (
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium text-text-secondary">Workplace / Location</label>
-                                                    <input
+                                            // 4. Occupation Place for others (fallback)
+                                            const noWorkPlaceRoles = ["Unemployed", "Looking for Opportunities", "Homemaker"];
+                                            if (!noWorkPlaceRoles.includes(type)) {
+                                                return (
+                                                    <Input
+                                                        label="Workplace / Location"
+                                                        icon={Briefcase}
                                                         disabled={!isEditing}
                                                         type="text"
                                                         name="profession.occupationPlace"
@@ -489,53 +480,57 @@ export default function ProfilePage() {
                                                             ...prev, 
                                                             profession: { ...prev.profession, occupationPlace: e.target.value } as any
                                                         }))}
-                                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
                                                         placeholder="Where do you work?"
                                                     />
-                                                </div>
-                                            );
-                                        }
+                                                );
+                                            }
 
-                                        return null;
-                                    })()}
+                                            return null;
+                                        })()}
+                                    </div>
                                 </div>
 
                                 <div className="space-y-2 md:col-span-2">
-                                    <label className="text-sm font-medium text-text-secondary">Bio</label>
+                                    <label className="text-sm font-bold text-text-muted uppercase tracking-wider">Bio</label>
                                     <textarea
                                             disabled={!isEditing}
                                         name="bio"
                                         value={formData.bio || ''}
                                         onChange={handleInputChange}
                                         rows={3}
-                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors resize-none"
+                                        className="w-full bg-surface-hover/50 border border-border rounded-2xl px-5 py-4 text-text-primary focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all resize-none font-medium disabled:opacity-60 disabled:cursor-not-allowed focus:bg-surface-hover"
                                         placeholder="Tell us about yourself..."
                                     />
                                 </div>
 
                                 {/* Country of Residence */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-text-secondary">Country of Residence</label>
+                                    <label className="text-sm font-bold text-text-muted uppercase tracking-wider">Country of Residence</label>
                                     <div className="relative">
-                                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary" size={18} />
+                                        <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted icon-gold-focus" size={18} />
                                         <select
                                             disabled={!isEditing}
                                             name="country"
                                             value={formData.country || ''}
                                             onChange={handleInputChange}
-                                            className="w-full bg-surface border border-glass-border rounded-lg pl-10 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none"
+                                            className="w-full bg-surface-hover/50 border border-border rounded-2xl pl-12 pr-4 py-3.5 text-text-primary focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all font-medium appearance-none disabled:opacity-60 disabled:cursor-not-allowed focus:bg-surface-hover"
                                         >
                                             <option value="" className="bg-surface">Select Country</option>
                                             {COUNTRIES.map(c => (
-                                                <option key={c} value={c} className="bg-surface text-white">{c}</option>
+                                                <option key={c} value={c} className="bg-surface text-text-primary">{c}</option>
                                             ))}
                                         </select>
+                                        <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-text-muted">
+                                            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                                            </svg>
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Region Preference */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-text-secondary">Region Preference (For Matching)</label>
+                                    <label className="text-sm font-bold text-text-muted uppercase tracking-wider">Region Preference (For Matching)</label>
                                     {isEditing ? (
                                         <MultiSelectDropdown
                                             label=""
@@ -553,15 +548,15 @@ export default function ProfilePage() {
                                             }}
                                         />
                                     ) : (
-                                        <div className="flex flex-wrap gap-2 min-h-[42px] items-center p-2 bg-surface border border-glass-border rounded-lg">
+                                        <div className="flex flex-wrap gap-2 min-h-[50px] items-center p-2.5 bg-surface-hover/30 border border-border rounded-2xl">
                                             {(formData.preferences?.region && (formData.preferences.region.length > 0)) ? (
                                                 formData.preferences.region.map(r => (
-                                                    <span key={r} className="px-2 py-1 rounded-full bg-primary/20 text-primary text-xs border border-primary/30">
+                                                    <span key={r} className="px-3 py-1.5 rounded-full bg-gold/10 text-gold text-xs font-bold border border-gold/20 shadow-sm">
                                                         {r}
                                                     </span>
                                                 ))
                                             ) : (
-                                                <span className="text-text-secondary text-sm">No region preference.</span>
+                                                <span className="text-text-muted text-sm font-medium px-2">No region preference set.</span>
                                             )}
                                         </div>
                                     )}
@@ -570,16 +565,15 @@ export default function ProfilePage() {
 
 
                                 {/* Interests */}
-                              {/* Interests */}
-<div className="space-y-2 md:col-span-2">
-    <label className="text-sm font-medium text-text-secondary">Interests</label>
+<div className="space-y-3 md:col-span-2">
+    <label className="text-sm font-bold text-text-muted uppercase tracking-wider">Interests</label>
 
     {/* Show selected interests */}
     <div className="flex flex-wrap gap-2 mb-2">
         {(formData.interests || []).map(interest => (
             <span
                 key={interest}
-                className="px-3 py-1 rounded-full bg-primary/20 text-primary text-sm flex items-center gap-1"
+                className="px-3 py-1.5 rounded-full bg-gold/10 text-gold font-bold text-sm flex items-center gap-2 border border-gold/20 shadow-sm animate-in zoom-in-95"
             >
                 {interest}
 
@@ -587,7 +581,7 @@ export default function ProfilePage() {
                     <button
                         type="button"
                         onClick={() => removeInterest(interest)}
-                        className="hover:text-white"
+                        className="hover:text-white transition-colors"
                     >
                         <XCircle size={14} />
                     </button>
@@ -598,7 +592,7 @@ export default function ProfilePage() {
 
     {/* Input + Add button (enabled only in edit mode) */}
     <fieldset disabled={!isEditing} className={!isEditing ? "opacity-50 pointer-events-none" : ""}>
-        <div className="flex gap-2">
+        <div className="flex gap-3">
             <input
                 type="text"
                 value={customInterest}
@@ -609,14 +603,14 @@ export default function ProfilePage() {
                         addInterest(customInterest);
                     }
                 }}
-                className="flex-1 bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
+                className="flex-1 bg-surface-hover/50 border border-border rounded-2xl px-5 py-3.5 text-text-primary focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-colors font-medium focus:bg-surface-hover"
                 placeholder="Add an interest..."
             />
 
             <button
                 type="button"
                 onClick={() => addInterest(customInterest)}
-                className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+                className="px-6 py-3 bg-surface-hover hover:bg-gold hover:text-white rounded-2xl font-bold transition-all shadow-sm border border-border hover:border-gold"
             >
                 Add
             </button>
@@ -625,15 +619,15 @@ export default function ProfilePage() {
 
     {/* Suggestions - only clickable when editing */}
     <fieldset disabled={!isEditing} className={!isEditing ? "opacity-40 pointer-events-none" : ""}>
-        <div className="mt-2">
-            <p className="text-xs text-text-secondary mb-2">Suggestions:</p>
+        <div className="mt-3">
+            <p className="text-xs text-text-muted mb-2 font-bold uppercase tracking-wider">Suggestions:</p>
             <div className="flex flex-wrap gap-2">
                 {INTERESTS_LIST.slice(0, 10).map((interest) => (
                     <button
                         key={interest}
                         type="button"
                         onClick={() => addInterest(interest)}
-                        className="px-3 py-1 rounded-full bg-surface border border-glass-border text-xs hover:border-primary transition-colors"
+                        className="px-3 py-1.5 rounded-full bg-surface border border-border text-xs font-bold text-text-secondary hover:border-gold hover:text-gold transition-colors"
                     >
                         {interest}
                     </button>
@@ -646,7 +640,7 @@ export default function ProfilePage() {
 
                                 {/* Languages */}
                                 <div className="space-y-2 md:col-span-2">
-                                    <label className="text-sm font-medium text-text-secondary">Languages (Select Flags)</label>
+                                    <label className="text-sm font-bold text-text-muted uppercase tracking-wider">Languages (Select Flags)</label>
                                     {isEditing ? (
                                         <>
                                             <MultiSelectDropdown
@@ -677,15 +671,17 @@ export default function ProfilePage() {
                                                     }));
                                                 }}
                                             />
-                                            <p className="text-xs text-text-secondary mt-1">Select country flags to include all languages from that country.</p>
+                                            <p className="text-xs text-text-muted mt-2 font-medium bg-surface-hover/50 p-2 rounded-lg inline-block">
+                                                💡 Select country flags to include all languages from that country.
+                                            </p>
                                         </>
                                     ) : (
-                                        <div className="flex flex-wrap gap-2 min-h-[42px] items-center p-2 bg-surface border border-glass-border rounded-lg">
+                                        <div className="flex flex-wrap gap-2 min-h-[50px] items-center p-2.5 bg-surface-hover/30 border border-border rounded-2xl">
                                             {(formData.preferences?.languageCountries && formData.preferences.languageCountries.length > 0) ? (
                                                 formData.preferences.languageCountries.map((c: string) => {
                                                     const mapping = COUNTRY_LANGUAGES_MAPPING[c];
                                                     return mapping ? (
-                                                        <div key={c} className="w-8 h-6 relative shrink-0 shadow-sm border border-glass-border rounded-sm" title={c}>
+                                                        <div key={c} className="w-8 h-6 relative shrink-0 shadow-sm border border-border rounded-sm hover:scale-110 transition-transform cursor-help" title={c}>
                                                             <Image 
                                                                 src={mapping.flag} 
                                                                 alt={c} 
@@ -693,10 +689,10 @@ export default function ProfilePage() {
                                                                 className="object-cover rounded-[1px]" 
                                                             />
                                                         </div>
-                                                    ) : <span key={c} className="text-xs text-text-secondary">{c}</span>;
+                                                    ) : <span key={c} className="text-xs text-text-secondary bg-surface px-2 py-1 rounded-md">{c}</span>;
                                                 })
                                             ) : (
-                                                <span className="text-text-secondary text-sm">No languages selected.</span>
+                                                <span className="text-text-muted text-sm font-medium px-2">No languages selected.</span>
                                             )}
                                         </div>
                                     )}
@@ -704,34 +700,33 @@ export default function ProfilePage() {
 
                                 {/* Other Fields */}
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium text-text-secondary">Gender</label>
+                                    <label className="text-sm font-bold text-text-muted uppercase tracking-wider">Gender</label>
                                     <select
                                         name="gender"
                                         value={formData.gender || ''}
                                         onChange={handleInputChange}
-                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors appearance-none"
+                                        disabled={!isEditing}
+                                        className="w-full bg-surface-hover/50 border border-border rounded-2xl px-4 py-3.5 text-text-primary focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all font-medium appearance-none disabled:opacity-60 disabled:cursor-not-allowed focus:bg-surface-hover"
                                     >
-                                        <option value="" className="bg-surface">Select Gender</option>
-                                        <option value="male" className="bg-surface text-black">Male</option>
-                                        <option value="female" className="bg-surface text-black">Female</option>
-                                        <option value="other" className="bg-surface text-black">Other</option>
+                                        <option value="" className="bg-surface text-text-muted">Select Gender</option>
+                                        <option value="male" className="bg-surface text-text-primary">Male</option>
+                                        <option value="female" className="bg-surface text-text-primary">Female</option>
+                                        <option value="other" className="bg-surface text-text-primary">Other</option>
                                     </select>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <label className="text-sm font-medium text-text-secondary">Age</label>
-                                    <input
-                                        type="number"
-                                        name="age"
-                                        value={formData.age || ''}
-                                        onChange={handleInputChange}
-                                        className="w-full bg-surface border border-glass-border rounded-lg px-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-colors"
-                                        placeholder="25"
-                                    />
-                                </div>
+                                <Input
+                                    label="Age"
+                                    type="number"
+                                    name="age"
+                                    value={formData.age || ''}
+                                    onChange={handleInputChange}
+                                    disabled={!isEditing}
+                                    placeholder="25"
+                                />
                             </div>
                             
-                            <div className="pt-4 flex justify-end gap-3">
+                            <div className="pt-6 flex justify-end gap-4 border-t border-border mt-8">
                                 {isEditing ? (
                                     <>
                                         <button
@@ -757,14 +752,14 @@ export default function ProfilePage() {
                                                     }
                                                 });
                                             }}
-                                            className="bg-white/5 hover:bg-white/10 text-white px-6 py-3 rounded-lg font-medium transition-all"
+                                            className="bg-surface hover:bg-surface-hover text-text-primary px-6 py-3 rounded-2xl font-bold transition-all border border-border"
                                         >
                                             Cancel
                                         </button>
                                         <button
                                             type="submit"
                                             disabled={isLoading}
-                                            className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-lg font-medium transition-all shadow-[0_0_20px_rgba(127,25,230,0.3)] hover:shadow-[0_0_30px_rgba(127,25,230,0.5)] flex items-center gap-2"
+                                            className="bg-gold hover:bg-gold-hover text-white px-8 py-3 rounded-2xl font-bold transition-all shadow-gold-glow hover:shadow-gold-glow/80 active:scale-95 flex items-center gap-2"
                                         >
                                             {isLoading ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
                                             Save Changes
@@ -774,7 +769,7 @@ export default function ProfilePage() {
                                     <button
                                         type="button"
                                         onClick={() => setIsEditing(true)}
-                                        className="bg-primary hover:bg-primary/90 text-white px-8 py-3 rounded-lg font-medium transition-all shadow-[0_0_20px_rgba(127,25,230,0.3)] hover:shadow-[0_0_30px_rgba(127,25,230,0.5)] flex items-center gap-2"
+                                        className="bg-gold hover:bg-gold-hover text-white px-8 py-3 rounded-2xl font-bold transition-all shadow-gold-glow hover:shadow-gold-glow/80 active:scale-95 flex items-center gap-2"
                                     >
                                         Edit Profile
                                     </button>

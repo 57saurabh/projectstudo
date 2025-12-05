@@ -53,11 +53,11 @@ export default function Header() {
         <motion.header
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="flex items-center justify-between px-4 py-3 mx-2 mt-2 lg:px-8 lg:py-4 lg:mx-4 lg:mt-4 mb-0 bg-white/80 dark:bg-[#191121]/90 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 rounded-2xl shadow-lg z-30 sticky top-2 lg:top-4"
+            className="flex items-center justify-between px-4 py-3 mx-2 mt-2 lg:px-8 lg:py-4 lg:mx-4 lg:mt-4 mb-0 bg-surface/90 backdrop-blur-xl border border-border rounded-3xl shadow-lg z-30 sticky top-2 lg:top-4 transition-colors duration-300"
         >
             {/* Left: Title / Breadcrumbs */}
             <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-white/60">
+                <h1 className="text-2xl font-black tracking-tight text-white">
                     {title}
                 </h1>
             </div>
@@ -65,28 +65,30 @@ export default function Header() {
             {/* Right: Actions & Profile */}
             <div className="flex items-center gap-6">
                 {/* Search Bar (Optional/Visual only for now) */}
-                <div className="hidden md:flex items-center px-4 py-2 bg-gray-100 dark:bg-white/5 rounded-xl border border-transparent focus-within:border-purple-500/50 transition-all w-64">
-                    <Search size={18} className="text-gray-400" />
+                <div className="hidden md:flex items-center px-4 py-2.5 bg-surface-hover rounded-2xl border border-border focus-within:border-gold/50 transition-all w-64 shadow-inner">
+                    <Search size={18} className="text-text-muted" />
                     <input
                         type="text"
                         placeholder="Search..."
-                        className="bg-transparent border-none outline-none ml-2 text-sm text-gray-700 dark:text-white w-full placeholder:text-gray-400"
+                        className="bg-transparent border-none outline-none ml-2 text-sm text-text-primary w-full placeholder:text-text-muted font-medium"
                     />
                 </div>
 
                 {/* Icons */}
                 <div className="flex items-center gap-3">
-                    <button className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-500 dark:text-white/60 transition-colors relative">
+                    <button className="p-2.5 rounded-2xl hover:bg-surface-hover text-text-secondary hover:text-gold transition-colors relative shadow-sm hover:shadow-gold/10">
                         <Bell size={20} />
-                        <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-[#191121]" />
+                        <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-danger rounded-full border-2 border-surface shadow-danger-glow" />
                     </button>
-                    <button className="p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-white/5 text-gray-500 dark:text-white/60 transition-colors">
-                        <Settings size={20} />
-                    </button>
+                    <Link href="/settings">
+                        <button className="p-2.5 rounded-2xl hover:bg-surface-hover text-text-secondary hover:text-gold transition-colors shadow-sm hover:shadow-gold/10">
+                            <Settings size={20} />
+                        </button>
+                    </Link>
                 </div>
 
                 {/* Separator */}
-                <div className="w-px h-8 bg-gray-200 dark:bg-white/10" />
+                <div className="w-px h-8 bg-border" />
 
                 {/* User Profile Dropdown */}
                 <div className="relative" ref={dropdownRef}>
@@ -95,26 +97,26 @@ export default function Header() {
                         className="flex items-center gap-3 pl-2 group outline-none"
                     >
                         <div className="hidden md:flex flex-col items-end">
-                            <span className="text-sm font-bold text-gray-900 dark:text-white group-hover:text-purple-500 transition-colors">
+                            <span className="text-sm font-bold text-text-primary group-hover:text-gold transition-colors">
                                 {user?.displayName || 'Guest'}
                             </span>
-                            <span className="text-xs font-medium text-purple-600 dark:text-purple-400">
+                            <span className="text-xs font-bold text-orange tracking-wider">
                                 {user?.reputationScore || 0} XP
                             </span>
                         </div>
                         <div className="relative">
-                            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#7f19e6] to-[#5b12a5] p-[2px] shadow-lg shadow-purple-500/20 group-hover:shadow-purple-500/40 transition-all">
-                                <div className="w-full h-full rounded-[10px] bg-white dark:bg-[#191121] flex items-center justify-center overflow-hidden">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold to-orange p-[2px] shadow-gold-glow group-hover:scale-105 transition-all duration-300">
+                                <div className="w-full h-full rounded-[14px] bg-surface flex items-center justify-center overflow-hidden">
                                     {user?.avatarUrl ? (
                                         <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
                                     ) : (
-                                        <span className="font-bold text-sm text-gray-900 dark:text-white">
+                                        <span className="font-black text-lg text-gold">
                                             {user?.displayName?.[0]?.toUpperCase() || 'U'}
                                         </span>
                                     )}
                                 </div>
                             </div>
-                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-[#191121] rounded-full" />
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-surface rounded-full shadow-lg" />
                         </div>
                     </button>
 
@@ -126,35 +128,41 @@ export default function Header() {
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: 10, scale: 0.95 }}
                                 transition={{ duration: 0.2 }}
-                                className="absolute right-0 top-full mt-4 w-64 bg-white dark:bg-[#191121] rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 overflow-hidden z-50"
+                                className="absolute right-0 top-full mt-4 w-72 bg-surface/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-border overflow-hidden z-50 ring-1 ring-gold/10"
                             >
-                                <div className="p-4 border-b border-gray-100 dark:border-white/5">
-                                    <p className="font-bold text-gray-900 dark:text-white">{user?.displayName || 'Guest'}</p>
-                                    <p className="text-xs text-gray-500 dark:text-white/50 truncate">{user?.email || 'No email'}</p>
+                                <div className="p-6 border-b border-border bg-surface-hover/30">
+                                    <p className="font-bold text-lg text-text-primary">{user?.displayName || 'Guest'}</p>
+                                    <p className="text-xs text-text-muted font-medium truncate">{user?.email || 'No email'}</p>
                                 </div>
                                 
-                                <div className="p-2 space-y-1">
+                                <div className="p-3 space-y-1">
                                     <Link href="/settings/profile" onClick={() => setIsDropdownOpen(false)}>
-                                        <div className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-white/80 transition-colors cursor-pointer">
-                                            <User size={18} />
-                                            <span className="font-medium">Profile</span>
+                                        <div className="flex items-center gap-4 px-4 py-3 rounded-2xl hover:bg-surface-hover text-text-primary transition-colors cursor-pointer group">
+                                            <div className="p-2 rounded-xl bg-surface border border-border group-hover:border-gold/50 group-hover:text-gold transition-colors">
+                                                <User size={18} />
+                                            </div>
+                                            <span className="font-bold text-sm">Profile</span>
                                         </div>
                                     </Link>
                                     <Link href="/settings" onClick={() => setIsDropdownOpen(false)}>
-                                        <div className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-white/80 transition-colors cursor-pointer">
-                                            <Settings size={18} />
-                                            <span className="font-medium">Settings</span>
+                                        <div className="flex items-center gap-4 px-4 py-3 rounded-2xl hover:bg-surface-hover text-text-primary transition-colors cursor-pointer group">
+                                            <div className="p-2 rounded-xl bg-surface border border-border group-hover:border-gold/50 group-hover:text-gold transition-colors">
+                                                <Settings size={18} />
+                                            </div>
+                                            <span className="font-bold text-sm">Settings</span>
                                         </div>
                                     </Link>
                                 </div>
 
-                                <div className="p-2 border-t border-gray-100 dark:border-white/5">
+                                <div className="p-3 border-t border-border mt-1">
                                     <button 
                                         onClick={handleLogout}
-                                        className="flex items-center gap-3 px-4 py-3 w-full rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10 text-red-500 transition-colors"
+                                        className="flex items-center gap-4 px-4 py-3 w-full rounded-2xl hover:bg-danger/10 text-danger transition-colors group"
                                     >
-                                        <LogOut size={18} />
-                                        <span className="font-medium">Logout</span>
+                                        <div className="p-2 rounded-xl bg-surface border border-border group-hover:border-danger/30 transition-colors">
+                                            <LogOut size={18} />
+                                        </div>
+                                        <span className="font-bold text-sm">Logout</span>
                                     </button>
                                 </div>
                             </motion.div>

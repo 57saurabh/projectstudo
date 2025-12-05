@@ -482,34 +482,34 @@ export default function MessagesPage() {
     };
 
     return (
-        <div className="p-4 lg:p-8 h-screen text-text-primary flex flex-col transition-colors duration-300 overflow-hidden">
+        <div className="p-4 lg:p-8 h-screen bg-background text-text-primary flex flex-col transition-colors duration-300 overflow-hidden">
             <div className="mb-4 flex justify-between items-center">
-                <h1 className="text-2xl font-bold">Messages</h1>
+                <h1 className="text-3xl font-black tracking-tighter">Messages</h1>
                 <button
                     onClick={handleStartNewChat}
-                    className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+                    className="px-6 py-3 bg-gold text-white rounded-2xl text-sm font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95"
                 >
                     New Chat
                 </button>
             </div>
 
-            <div className="flex flex-1 gap-6 overflow-hidden bg-surface border border-glass-border rounded-2xl shadow-xl relative">
+            <div className="flex flex-1 gap-6 overflow-hidden bg-surface border border-border rounded-3xl shadow-2xl relative">
                 {/* New Chat Modal */}
                 {showNewChatModal && (
-                    <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-                        <div className="bg-surface border border-glass-border rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl">
-                            <div className="p-4 border-b border-glass-border flex justify-between items-center">
-                                <h3 className="font-bold text-lg">Start New Chat</h3>
+                    <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-md flex items-center justify-center p-4">
+                        <div className="bg-surface border border-border rounded-3xl w-full max-w-md max-h-[80vh] flex flex-col shadow-2xl">
+                            <div className="p-6 border-b border-border flex justify-between items-center">
+                                <h3 className="font-bold text-xl">Start New Chat</h3>
                                 <button
                                     onClick={() => setShowNewChatModal(false)}
-                                    className="p-1 hover:bg-glass-bg rounded-full"
+                                    className="p-2 hover:bg-surface-hover rounded-full transition-colors"
                                 >
                                     <ArrowLeft size={20} />
                                 </button>
                             </div>
-                            <div className="flex-1 overflow-y-auto p-2">
+                            <div className="flex-1 overflow-y-auto p-2 scrollbar-hide">
                                 {friends.length === 0 ? (
-                                    <div className="text-center p-8 text-text-secondary">
+                                    <div className="text-center p-8 text-text-muted">
                                         No friends found. Add friends first!
                                     </div>
                                 ) : (
@@ -517,7 +517,7 @@ export default function MessagesPage() {
                                         <button
                                             key={friend._id}
                                             onClick={() => selectFriendForChat(friend)}
-                                            className="w-full flex items-center gap-3 p-3 hover:bg-glass-bg rounded-xl transition-colors text-left"
+                                            className="w-full flex items-center gap-4 p-4 hover:bg-surface-hover rounded-2xl transition-colors text-left border-b border-border/50 last:border-0"
                                         >
                                             <img
                                                 src={
@@ -525,13 +525,13 @@ export default function MessagesPage() {
                                                     `https://api.dicebear.com/7.x/avataaars/svg?seed=${friend._id}`
                                                 }
                                                 alt={friend.displayName}
-                                                className="w-10 h-10 rounded-full bg-gray-700 object-cover"
+                                                className="w-12 h-12 rounded-full bg-background object-cover border border-border"
                                             />
                                             <div>
-                                                <p className="font-medium">
+                                                <p className="font-bold text-lg">
                                                     {friend.displayName}
                                                 </p>
-                                                <p className="text-xs text-text-secondary">
+                                                <p className="text-xs text-text-muted font-medium">
                                                     @{friend.username}
                                                 </p>
                                             </div>
@@ -546,29 +546,29 @@ export default function MessagesPage() {
                 {/* Chat List */}
                 <div
                     className={`${activeConversation ? 'hidden md:flex' : 'flex'
-                        } w-full md:w-80 lg:w-96 flex-col border-r border-glass-border bg-surface/50`}
+                        } w-full md:w-80 lg:w-96 flex-col border-r border-border bg-surface`}
                 >
-                    <div className="p-4 border-b border-glass-border">
+                    <div className="p-6 border-b border-border">
                         <div className="relative">
                             <Search
-                                className="absolute left-3 top-1/2 -translate-y-1/2 text-text-secondary"
+                                className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted"
                                 size={18}
                             />
                             <input
                                 type="text"
                                 placeholder="Search chats..."
-                                className="w-full bg-glass-bg border border-glass-border rounded-xl py-2 pl-10 pr-4 text-sm text-text-primary focus:outline-none focus:border-primary/50"
+                                className="w-full bg-surface-hover border border-border rounded-2xl py-3 pl-12 pr-4 text-sm text-text-primary focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all font-medium"
                             />
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                    <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide">
                         {isLoading ? (
-                            <div className="text-center p-4 text-text-secondary">
+                            <div className="text-center p-4 text-text-muted">
                                 Loading...
                             </div>
                         ) : conversations.length === 0 ? (
-                            <div className="text-center p-4 text-text-secondary">
+                            <div className="text-center p-4 text-text-muted">
                                 No conversations yet.
                             </div>
                         ) : (
@@ -597,33 +597,38 @@ export default function MessagesPage() {
                                     <div
                                         key={conv._id}
                                         onClick={() => setActiveConversation(conv)}
-                                        className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${activeConversation?._id === conv._id
-                                            ? 'bg-primary/10 border border-primary/20'
-                                            : 'hover:bg-glass-bg border border-transparent'
+                                        className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-200 ${activeConversation?._id === conv._id
+                                            ? 'bg-gold/10 border border-gold/30 shadow-sm'
+                                            : 'hover:bg-surface-hover border border-transparent'
                                             }`}
                                     >
-                                        <img
-                                            src={
-                                                conv.user.avatarUrl ||
-                                                `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv._id}`
-                                            }
-                                            alt={conv.user.displayName}
-                                            className="w-10 h-10 rounded-full bg-gray-700 object-cover"
-                                        />
+                                        <div className="relative">
+                                            <img
+                                                src={
+                                                    conv.user.avatarUrl ||
+                                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv._id}`
+                                                }
+                                                alt={conv.user.displayName}
+                                                className="w-12 h-12 rounded-full bg-background object-cover border border-border"
+                                            />
+                                            {onlineUsers.has(conv._id) && (
+                                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-orange rounded-full border-2 border-surface shadow-orange-glow"></div>
+                                            )}
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center justify-between mb-1">
-                                                <h4 className="font-medium truncate text-sm">
+                                                <h4 className={`font-bold truncate text-base ${activeConversation?._id === conv._id ? 'text-gold' : 'text-text-primary'}`}>
                                                     {conv.user.displayName}
                                                 </h4>
                                                 {lastMessageTime && (
-                                                    <span className="text-xs text-text-secondary">
+                                                    <span className="text-xs text-text-muted font-medium">
                                                         {lastMessageTime}
                                                     </span>
                                                 )}
                                             </div>
                                             <div className="flex justify-between items-center">
                                                 <p
-                                                    className={`text-xs truncate ${conv.unreadCount > 0
+                                                    className={`text-sm truncate ${conv.unreadCount > 0
                                                         ? 'font-bold text-text-primary'
                                                         : 'text-text-secondary'
                                                         }`}
@@ -632,7 +637,7 @@ export default function MessagesPage() {
                                                     {lastText}
                                                 </p>
                                                 {conv.unreadCount > 0 && (
-                                                    <span className="bg-primary text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ml-2">
+                                                    <span className="bg-gold text-white text-[10px] font-black px-2 py-0.5 rounded-full min-w-[20px] text-center ml-2 shadow-gold-glow">
                                                         {conv.unreadCount}
                                                     </span>
                                                 )}
@@ -652,10 +657,10 @@ export default function MessagesPage() {
                             } flex-1 flex-col bg-surface`}
                     >
                         {/* Header */}
-                        <div className="p-4 border-b border-glass-border flex items-center gap-3 bg-surface/80 backdrop-blur-md">
+                        <div className="p-4 border-b border-border flex items-center gap-4 bg-surface/90 backdrop-blur-md z-10 shadow-sm">
                             <button
                                 onClick={() => setActiveConversation(null)}
-                                className="md:hidden p-2 hover:bg-glass-bg rounded-full"
+                                className="md:hidden p-2 hover:bg-surface-hover rounded-full"
                             >
                                 <ArrowLeft size={20} />
                             </button>
@@ -665,24 +670,24 @@ export default function MessagesPage() {
                                     `https://api.dicebear.com/7.x/avataaars/svg?seed=${activeConversation._id}`
                                 }
                                 alt={activeConversation.user.displayName}
-                                className="w-10 h-10 rounded-full bg-gray-700 object-cover"
+                                className="w-10 h-10 rounded-full bg-background object-cover border border-border"
                             />
                             <div>
-                                <h3 className="font-bold">
+                                <h3 className="font-bold text-lg leading-tight">
                                     {activeConversation.user.displayName}
                                 </h3>
                                 <p
-                                    className={`text-xs flex items-center gap-1 ${onlineUsers.has(activeConversation._id)
-                                        ? 'text-green-500'
-                                        : 'text-gray-400'
+                                    className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${onlineUsers.has(activeConversation._id)
+                                        ? 'text-orange'
+                                        : 'text-text-muted'
                                         }`}
                                 >
                                     <span
-                                        className={`w-2 h-2 rounded-full ${onlineUsers.has(
+                                        className={`w-1.5 h-1.5 rounded-full ${onlineUsers.has(
                                             activeConversation._id
                                         )
-                                            ? 'bg-green-500'
-                                            : 'bg-gray-400'
+                                            ? 'bg-orange animate-pulse'
+                                            : 'bg-text-secondary'
                                             }`}
                                     ></span>
                                     {onlineUsers.has(activeConversation._id)
@@ -693,7 +698,7 @@ export default function MessagesPage() {
                         </div>
 
                         {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-glass-bg/30">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-surface">
                             {messages.map((msg) => {
                                 const isMe = msg.senderId === user?._id;
                                 return (
@@ -705,34 +710,33 @@ export default function MessagesPage() {
                                             }`}
                                     >
                                         <div
-                                            className={`max-w-[70%] rounded-2xl px-4 py-2 ${isMe
-                                                ? 'bg-primary text-white rounded-tr-none'
-                                                : 'bg-surface border border-glass-border rounded-tl-none'
+                                            className={`max-w-[75%] rounded-3xl px-6 py-4 shadow-md ${isMe
+                                                ? 'bg-gold text-white rounded-tr-none shadow-gold-glow'
+                                                : 'bg-accent-cream text-background rounded-tl-none'
                                                 }`}
                                         >
-                                            <p className="text-sm">
+                                            <p className="text-sm font-medium leading-relaxed">
                                                 {msg.text}
                                             </p>
-                                            <p
-                                                className={`text-[10px] mt-1 ${isMe
-                                                    ? 'text-white/70'
-                                                    : 'text-text-secondary'
-                                                    }`}
-                                            >
-                                                {new Date(
-                                                    msg.timestamp
-                                                ).toLocaleTimeString([], {
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
-                                            </p>
-                                            {isMe && (
-                                                <div className="flex justify-end mt-1">
-                                                    {msg.status === 'pending' && <Clock size={12} className="text-white/70" />}
-                                                    {msg.status === 'sent' && <Check size={12} className="text-white/70" />}
-                                                    {msg.status === 'read' && <CheckCheck size={12} className="text-blue-200" />}
-                                                </div>
-                                            )}
+                                            <div className="flex items-center justify-end gap-1 mt-1.5 opacity-80">
+                                                <p
+                                                    className="text-[10px] font-bold"
+                                                >
+                                                    {new Date(
+                                                        msg.timestamp
+                                                    ).toLocaleTimeString([], {
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
+                                                </p>
+                                                {isMe && (
+                                                    <div className="flex items-center">
+                                                        {msg.status === 'pending' && <Clock size={10} />}
+                                                        {msg.status === 'sent' && <Check size={10} />}
+                                                        {msg.status === 'read' && <CheckCheck size={10} />}
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -744,9 +748,9 @@ export default function MessagesPage() {
                         {canSend ? (
                             <form
                                 onSubmit={handleSendMessage}
-                                className="p-4 border-t border-glass-border bg-surface"
+                                className="p-4 border-t border-border bg-surface"
                             >
-                                <div className="flex gap-2">
+                                <div className="flex gap-3">
                                     <input
                                         type="text"
                                         value={inputText}
@@ -754,40 +758,40 @@ export default function MessagesPage() {
                                             setInputText(e.target.value)
                                         }
                                         placeholder="Type a message..."
-                                        className="flex-1 bg-glass-bg border border-glass-border rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-primary/50"
+                                        className="flex-1 bg-surface-hover border border-border rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all font-medium text-text-primary placeholder-text-muted"
                                     />
                                     <button
                                         type="submit"
                                         disabled={!inputText.trim()}
-                                        className="p-3 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                        className="p-4 bg-gold text-white rounded-2xl hover:bg-gold-hover shadow-gold-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
                                     >
                                         <Send size={20} />
                                     </button>
                                 </div>
                             </form>
                         ) : (
-                            <div className="p-4 border-t border-glass-border bg-surface flex flex-col items-center justify-center gap-2">
-                                <p className="text-sm text-text-secondary">
+                            <div className="p-6 border-t border-border bg-surface flex flex-col items-center justify-center gap-4">
+                                <p className="text-sm text-text-muted font-medium">
                                     You can only chat with friends.
                                 </p>
                                 {friendRequestStatus === 'pending' ? (
                                     <button
                                         disabled
-                                        className="px-4 py-2 bg-gray-500 text-white rounded-xl text-sm font-medium cursor-not-allowed"
+                                        className="px-6 py-3 bg-surface-hover border border-border text-text-muted rounded-2xl text-sm font-bold cursor-not-allowed"
                                     >
                                         Request Sent
                                     </button>
                                 ) : friendRequestStatus === 'received' ? (
                                     <button
                                         onClick={acceptFriendRequest}
-                                        className="px-4 py-2 bg-green-600 text-white rounded-xl text-sm font-medium hover:bg-green-700 transition-colors"
+                                        className="px-6 py-3 bg-green-500 text-white rounded-2xl text-sm font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20"
                                     >
                                         Accept Friend Request
                                     </button>
                                 ) : (
                                     <button
                                         onClick={sendFriendRequest}
-                                        className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary/90 transition-colors"
+                                        className="px-6 py-3 bg-gold text-white rounded-2xl text-sm font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95"
                                     >
                                         Send Friend Request
                                     </button>
@@ -796,14 +800,14 @@ export default function MessagesPage() {
                         )}
                     </div>
                 ) : (
-                    <div className="hidden md:flex flex-1 items-center justify-center flex-col text-text-secondary">
-                        <div className="w-24 h-24 bg-glass-bg rounded-full flex items-center justify-center mb-6">
-                            <MessageSquare size={48} className="text-primary/50" />
+                    <div className="hidden md:flex flex-1 items-center justify-center flex-col text-text-secondary bg-surface/50">
+                        <div className="w-24 h-24 bg-surface-hover rounded-full flex items-center justify-center mb-6 shadow-orange-glow">
+                            <MessageSquare size={40} className="text-gold" />
                         </div>
-                        <h3 className="text-xl font-bold text-text-primary mb-2">
+                        <h3 className="text-2xl font-black text-white mb-2 tracking-tight">
                             Your Messages
                         </h3>
-                        <p>Select a conversation to start chatting</p>
+                        <p className="text-text-muted font-medium">Select a conversation to start chatting</p>
                     </div>
                 )}
             </div>

@@ -169,48 +169,48 @@ export default function LivePage() {
 
             <div className="flex-1 flex flex-col lg:flex-row h-screen overflow-hidden">
                 
-                {/* Left Panel: Studio Controls (Hidden when live if desired, or kept for control) */}
+                {/* Left Panel: Studio Controls */}
                 {!isLive && (
-                    <div className="w-full lg:w-96 bg-surface border-r border-glass-border p-6 overflow-y-auto z-20">
+                    <div className="w-full lg:w-96 bg-surface border-r border-border p-6 overflow-y-auto z-20 scrollbar-hide">
                         <div className="mb-8">
-                            <h1 className="text-2xl font-bold mb-2 flex items-center gap-2">
-                                <Radio className="text-primary" />
+                            <h1 className="text-2xl font-bold mb-2 flex items-center gap-2 text-white">
+                                <Radio className="text-gold" />
                                 Go Live Studio
                             </h1>
-                            <p className="text-text-secondary text-sm">Configure your stream settings.</p>
+                            <p className="text-text-muted text-sm">Configure your stream settings.</p>
                         </div>
 
                         <div className="space-y-8">
                             {/* Mode Selection */}
                             <div className="space-y-3">
-                                <label className="text-sm font-bold text-gray-400 uppercase tracking-wider">Broadcast Mode</label>
+                                <label className="text-xs font-bold text-text-secondary uppercase tracking-wider">Broadcast Mode</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     <button 
                                         onClick={() => setStreamMode('broadcast')}
-                                        className={`p-3 rounded-xl border text-left transition-all ${streamMode === 'broadcast' ? 'bg-primary/20 border-primary text-white' : 'bg-glass-bg border-glass-border text-gray-400'}`}
+                                        className={`p-3 rounded-2xl border text-left transition-all duration-300 ${streamMode === 'broadcast' ? 'bg-gold/20 border-gold text-white shadow-gold-glow' : 'bg-surface-hover border-border text-text-secondary hover:border-gold/50'}`}
                                     >
-                                        <Monitor size={20} className="mb-2" />
+                                        <Monitor size={20} className={`mb-2 ${streamMode === 'broadcast' ? 'text-gold' : ''}`} />
                                         <div className="font-bold text-sm">Solo</div>
                                     </button>
                                     <button 
                                         onClick={() => setStreamMode('random')}
-                                        className={`p-3 rounded-xl border text-left transition-all ${streamMode === 'random' ? 'bg-primary/20 border-primary text-white' : 'bg-glass-bg border-glass-border text-gray-400'}`}
+                                        className={`p-3 rounded-2xl border text-left transition-all duration-300 ${streamMode === 'random' ? 'bg-orange/20 border-orange text-white shadow-orange-glow' : 'bg-surface-hover border-border text-text-secondary hover:border-orange/50'}`}
                                     >
-                                        <Ghost size={20} className="mb-2" />
+                                        <Ghost size={20} className={`mb-2 ${streamMode === 'random' ? 'text-orange' : ''}`} />
                                         <div className="font-bold text-sm">Random</div>
                                     </button>
                                     <button 
                                         onClick={() => setStreamMode('private')}
-                                        className={`p-3 rounded-xl border text-left transition-all ${streamMode === 'private' ? 'bg-primary/20 border-primary text-white' : 'bg-glass-bg border-glass-border text-gray-400'}`}
+                                        className={`p-3 rounded-2xl border text-left transition-all duration-300 ${streamMode === 'private' ? 'bg-gold/20 border-gold text-white shadow-gold-glow' : 'bg-surface-hover border-border text-text-secondary hover:border-gold/50'}`}
                                     >
-                                        <Lock size={20} className="mb-2" />
+                                        <Lock size={20} className={`mb-2 ${streamMode === 'private' ? 'text-gold' : ''}`} />
                                         <div className="font-bold text-sm">Private</div>
                                     </button>
                                     <button 
                                         onClick={() => setStreamMode('group')}
-                                        className={`p-3 rounded-xl border text-left transition-all ${streamMode === 'group' ? 'bg-primary/20 border-primary text-white' : 'bg-glass-bg border-glass-border text-gray-400'}`}
+                                        className={`p-3 rounded-2xl border text-left transition-all duration-300 ${streamMode === 'group' ? 'bg-orange/20 border-orange text-white shadow-orange-glow' : 'bg-surface-hover border-border text-text-secondary hover:border-orange/50'}`}
                                     >
-                                        <Users size={20} className="mb-2" />
+                                        <Users size={20} className={`mb-2 ${streamMode === 'group' ? 'text-orange' : ''}`} />
                                         <div className="font-bold text-sm">Group</div>
                                     </button>
                                 </div>
@@ -218,7 +218,7 @@ export default function LivePage() {
 
                             {/* Device Selection */}
                             <div className="space-y-3">
-                                <label className="text-sm font-bold text-gray-400 uppercase tracking-wider">Devices</label>
+                                <label className="text-xs font-bold text-text-secondary uppercase tracking-wider">Devices</label>
                                 <DeviceSelector 
                                     selectedVideoDevice={selectedVideoDevice}
                                     selectedAudioDevice={selectedAudioDevice}
@@ -229,7 +229,7 @@ export default function LivePage() {
 
                             {/* Aspect Ratio */}
                             <div className="space-y-3">
-                                <label className="text-sm font-bold text-gray-400 uppercase tracking-wider">Aspect Ratio</label>
+                                <label className="text-xs font-bold text-text-secondary uppercase tracking-wider">Aspect Ratio</label>
                                 <RatioSelector 
                                     selectedRatio={aspectRatio}
                                     onChange={setAspectRatio}
@@ -238,24 +238,24 @@ export default function LivePage() {
 
                             {/* Screen Share */}
                             <div className="space-y-3">
-                                <label className="text-sm font-bold text-gray-400 uppercase tracking-wider">Content</label>
+                                <label className="text-xs font-bold text-text-secondary uppercase tracking-wider">Content</label>
                                 <button 
                                     onClick={toggleScreenShare}
-                                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${isScreenSharing ? 'bg-green-500/20 border-green-500 text-white' : 'bg-glass-bg border-glass-border text-gray-400'}`}
+                                    className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${isScreenSharing ? 'bg-gold/20 border-gold text-white shadow-gold-glow' : 'bg-surface-hover border-border text-text-secondary hover:text-white'}`}
                                 >
                                     <div className="flex items-center gap-3">
                                         <Share2 size={20} />
-                                        <span className="font-medium">Share Screen</span>
+                                        <span className="font-bold">Share Screen</span>
                                     </div>
-                                    <div className={`w-10 h-6 rounded-full p-1 transition-colors ${isScreenSharing ? 'bg-green-500' : 'bg-gray-600'}`}>
-                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${isScreenSharing ? 'translate-x-4' : ''}`} />
+                                    <div className={`w-10 h-6 rounded-full p-1 transition-colors ${isScreenSharing ? 'bg-gold' : 'bg-surface border border-border'}`}>
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform shadow-sm ${isScreenSharing ? 'translate-x-4' : ''}`} />
                                     </div>
                                 </button>
                             </div>
 
                             <button 
                                 onClick={handleStartClick}
-                                className="w-full py-4 bg-primary hover:bg-primary/90 rounded-xl font-bold text-lg transition-colors shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                                className="w-full py-4 bg-gold hover:bg-gold-hover rounded-2xl font-black text-lg text-white transition-all shadow-gold-glow hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
                             >
                                 {streamMode === 'broadcast' ? 'Start Broadcast' : `Start ${streamMode} Call`}
                             </button>
@@ -264,8 +264,8 @@ export default function LivePage() {
                 )}
 
                 {/* Main Preview Area */}
-                <div className="flex-1 flex items-center justify-center bg-black relative p-4 lg:p-10">
-                    <div className={`relative transition-all duration-500 ${getAspectRatioStyle()} bg-gray-900 rounded-2xl overflow-hidden shadow-2xl border border-white/10`}>
+                <div className="flex-1 flex items-center justify-center bg-black/90 relative p-4 lg:p-10">
+                    <div className={`relative transition-all duration-500 ${getAspectRatioStyle()} bg-surface rounded-3xl overflow-hidden shadow-2xl border border-border`}>
                         <video 
                             ref={videoRef}
                             autoPlay 
@@ -275,13 +275,13 @@ export default function LivePage() {
                         />
                         
                         {/* Overlay Info */}
-                        <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg text-white text-sm font-medium flex items-center gap-2">
+                        <div className="absolute bottom-6 left-6 bg-surface/60 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-white text-sm font-bold flex items-center gap-2">
                             {isScreenSharing ? <Monitor size={14} /> : <Video size={14} />}
                             {isScreenSharing ? 'Screen Share' : 'Camera'}
                         </div>
 
                         {isLive && (
-                            <div className="absolute top-4 right-4 bg-red-600 text-white px-3 py-1 rounded-lg font-bold animate-pulse">
+                            <div className="absolute top-6 right-6 bg-danger text-white px-4 py-1.5 rounded-full font-black animate-pulse shadow-danger-glow tracking-wide">
                                 LIVE
                             </div>
                         )}
@@ -290,7 +290,7 @@ export default function LivePage() {
 
                 {/* Chat Sidebar (Visible when live) */}
                 {isLive && sessionId && (
-                    <div className="w-80 border-l border-glass-border bg-surface/50 backdrop-blur-md hidden lg:block z-20">
+                    <div className="w-80 border-l border-border bg-surface/90 backdrop-blur-md hidden lg:block z-20">
                         <LiveChat sessionId={sessionId} />
                     </div>
                 )}

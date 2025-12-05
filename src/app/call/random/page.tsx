@@ -244,7 +244,7 @@ export default function RandomChatPage() {
     };
 
     return (
-        <div className="relative flex h-screen w-full flex-col bg-[#f7f6f8] dark:bg-[#191121] font-sans overflow-hidden">
+        <div className="relative flex h-screen w-full flex-col bg-background font-sans overflow-hidden text-text-primary">
             {/* Hidden Video for Analysis */}
             <video ref={analysisVideoRef} className="hidden" muted playsInline />
 
@@ -263,10 +263,10 @@ export default function RandomChatPage() {
             />
 
             {/* Main Content */}
-            <main className="flex-1 flex flex-col lg:flex-row gap-4 p-2 lg:p-6 overflow-y-auto lg:overflow-hidden">
+            <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 lg:p-6 overflow-hidden">
 
                 {/* Video Area */}
-                <div className="flex-1 relative flex flex-col justify-end items-center bg-black/50 rounded-xl overflow-hidden border border-white/10">
+                <div className="flex-1 relative flex flex-col justify-end items-center bg-surface rounded-3xl overflow-hidden border border-border shadow-2xl">
 
                     <MatchOverlay
                         callState={callState}

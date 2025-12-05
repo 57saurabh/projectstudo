@@ -1,67 +1,139 @@
 @import "tailwindcss";
 
 :root {
-  /* Dark mode (default) */
-  --background: #050505;
-  --surface: #121212;
-  --primary: #00f0ff;
-  --secondary: #8a2be2;
-  --accent: #39ff14;
-  --alert: #ff0099;
-  --glass-border: rgba(255, 255, 255, 0.05);
-  --glass-bg: rgba(255, 255, 255, 0.03);
-  --text-primary: #ffffff;
-  --text-secondary: rgba(255, 255, 255, 0.5);
-}
+  /* Core Backgrounds */
+  --background: #0E0E10;
+  --background-secondary: #151517;
 
-[data-theme='light'] {
-  /* Light mode */
-  --background: #ffffff;
-  --surface: #f3f4f6;
-  --primary: #0ea5e9;
-  --secondary: #8b5cf6;
-  --accent: #10b981;
-  --alert: #ef4444;
-  --glass-border: rgba(0, 0, 0, 0.1);
-  --glass-bg: rgba(0, 0, 0, 0.05);
-  --text-primary: #111827;
-  --text-secondary: #4b5563;
+  /* Surfaces */
+  --surface: #1C1C1F;
+  --surface-hover: #222225;
+  --border: #2C2C30;
+
+  /* Accents */
+  --accent-cream: #F5E9D4;
+  --accent-text: #E8D8C0;
+
+  /* Gold - Primary Actions */
+  --gold: #D89A1A;
+  --gold-hover: #C78B18;
+  --gold-glow: rgba(216, 154, 26, 0.35);
+
+  /* Orange - Secondary Actions */
+  --orange: #CF6920;
+  --orange-hover: #B85A1B;
+  --orange-glow: rgba(207, 105, 32, 0.35);
+
+  /* Danger - Destructive Actions */
+  --danger: #B00202;
+  --danger-hover: #9A0101;
+  --danger-glow: rgba(176, 2, 2, 0.35);
+
+  /* Text Colors */
+  --text-primary: #FFFFFF;
+  --text-secondary: #C8C5D0;
+  --text-muted: #8A8894;
+  --text-gold: #D89A1A;
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, sans-serif;
 }
 
 @theme {
   --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+
   --color-surface: var(--surface);
-  --color-primary: var(--primary);
-  --color-secondary: var(--secondary);
-  --color-accent: var(--accent);
-  --color-alert: var(--alert);
-  --color-glass-border: var(--glass-border);
-  --color-glass-bg: var(--glass-bg);
+  --color-surface-hover: var(--surface-hover);
+  --color-border: var(--border);
+
+  --color-accent-cream: var(--accent-cream);
+  --color-accent-text: var(--accent-text);
+
+  --color-gold: var(--gold);
+  --color-gold-hover: var(--gold-hover);
+
+  --color-orange: var(--orange);
+  --color-orange-hover: var(--orange-hover);
+
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-gold: var(--text-gold);
 
-  --font-sans: var(--font-inter), sans-serif;
+  --shadow-gold-glow: 0 0 20px var(--gold-glow);
+  --shadow-orange-glow: 0 0 20px var(--orange-glow);
+  --shadow-danger-glow: 0 0 20px var(--danger-glow);
 
-  --shadow-neon: 0 0 15px rgba(0, 240, 255, 0.5);
-  --shadow-neon-green: 0 0 15px rgba(57, 255, 20, 0.5);
-
-  --image-neon-gradient: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  --font-sans: var(--font-sans);
 }
 
 @utility glass {
-  background-color: var(--color-glass-bg);
+  background-color: rgba(28, 28, 31, 0.7);
   backdrop-filter: blur(12px);
-  border-width: 1px;
-  border-color: var(--color-glass-border);
+  border: 1px solid var(--border);
 }
 
-@utility text-glow {
-  text-shadow: 0 0 10px rgba(0, 240, 255, 0.7);
+@utility text-glow-gold {
+  text-shadow: 0 0 10px rgba(216, 154, 26, 0.5);
 }
 
 body {
-  background-color: var(--color-background);
-  color: var(--color-text-primary);
+  background-color: var(--background);
+  color: var(--text-primary);
   font-family: var(--font-sans);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  -webkit-font-smoothing: antialiased;
+}
+
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: var(--surface-hover);
+    border-radius: 50px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: var(--gold);
+  }
+
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-hover) transparent;
+}
+
+/* Global Premium Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-hover);
+  border-radius: 4px;
+  border: 2px solid var(--background);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--gold);
+}
+
+/* Firefox Global */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--surface-hover) var(--background);
 }

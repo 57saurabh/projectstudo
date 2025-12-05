@@ -116,10 +116,10 @@ export default function FriendsPage() {
                 {/* Header */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold">Friends</h1>
+                        <h1 className="text-3xl font-bold tracking-tight">Friends</h1>
                         <p className="text-text-secondary">Manage your connections</p>
                     </div>
-                    <button className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-xl font-medium hover:bg-primary/90 transition-colors">
+                    <button className="flex items-center gap-2 px-6 py-3 bg-gold text-white rounded-2xl font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95">
                         <UserPlus size={20} />
                         Add Friend
                     </button>
@@ -129,33 +129,33 @@ export default function FriendsPage() {
                 <div className="flex flex-col md:flex-row gap-4">
                     {/* Add Friend Search */}
                     <div className="relative group flex-1">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary group-focus-within:text-primary transition-colors" size={20} />
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted group-focus-within:text-gold transition-colors" size={20} />
                         <input
                             type="text"
-                            placeholder="Find friends..."
+                            placeholder="Find friends by Private ID..."
                             value={searchQuery}
                             onChange={(e) => handleSearch(e.target.value)}
-                            className="w-full bg-surface border border-glass-border rounded-xl pl-12 pr-4 py-3 text-text-primary focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-text-secondary"
+                            className="w-full bg-surface border border-border rounded-2xl pl-12 pr-4 py-4 text-text-primary focus:border-gold focus:ring-1 focus:ring-gold outline-none transition-all placeholder:text-text-muted"
                         />
 
                         {/* Search Results Dropdown */}
                         {searchQuery.length >= 3 && (
-                            <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-glass-border rounded-xl shadow-xl z-50 max-h-60 overflow-y-auto">
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-surface border border-border rounded-2xl shadow-xl z-50 max-h-60 overflow-y-auto">
                                 {isSearching ? (
                                     <div className="p-4 text-center text-text-secondary">Searching...</div>
                                 ) : searchResults.length > 0 ? (
                                     searchResults.map(user => (
-                                        <div key={user._id} className="flex items-center justify-between p-3 hover:bg-glass-bg transition-colors">
+                                        <div key={user._id} className="flex items-center justify-between p-4 hover:bg-surface-hover transition-colors border-b border-border last:border-0">
                                             <div className="flex items-center gap-3">
-                                                <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.displayName}`} alt={user.displayName} className="w-10 h-10 rounded-full" />
+                                                <img src={user.avatarUrl || `https://ui-avatars.com/api/?name=${user.displayName}`} alt={user.displayName} className="w-10 h-10 rounded-full bg-background" />
                                                 <div>
-                                                    <p className="font-medium text-text-primary">{user.displayName}</p>
-                                                    <p className="text-xs text-text-secondary">@{user.username}</p>
+                                                    <p className="font-bold text-text-primary">{user.displayName}</p>
+                                                    <p className="text-xs text-text-muted">@{user.username}</p>
                                                 </div>
                                             </div>
                                             <button
                                                 onClick={() => sendFriendRequest(user._id)}
-                                                className="p-2 bg-primary/10 text-primary rounded-lg hover:bg-primary hover:text-white transition-colors"
+                                                className="p-2 bg-surface border border-border text-gold rounded-xl hover:bg-gold hover:text-white transition-all shadow-sm"
                                             >
                                                 <UserPlus size={18} />
                                             </button>
@@ -168,14 +168,14 @@ export default function FriendsPage() {
                         )}
                     </div>
 
-                    <div className="flex bg-surface p-1 rounded-xl border border-glass-border">
+                    <div className="flex bg-surface p-1.5 rounded-2xl border border-border">
                         {['all', 'online', 'pending'].map((tab) => (
                             <button
                                 key={tab}
                                 onClick={() => setActiveTab(tab as any)}
-                                className={`px-6 py-2 rounded-lg text-sm font-medium capitalize transition-all ${activeTab === tab
-                                    ? 'bg-primary text-white shadow-lg'
-                                    : 'text-text-secondary hover:text-text-primary'
+                                className={`px-6 py-2.5 rounded-xl text-sm font-bold capitalize transition-all ${activeTab === tab
+                                    ? 'bg-gold text-white shadow-gold-glow'
+                                    : 'text-text-secondary hover:text-text-primary hover:bg-background'
                                     }`}
                             >
                                 {tab}
@@ -185,7 +185,7 @@ export default function FriendsPage() {
                 </div>
 
                 {/* Friends List */}
-                <div className="flex-1 overflow-y-auto pr-2 space-y-3">
+                <div className="flex-1 overflow-y-auto pr-2 space-y-3 pb-8 scrollbar-hide">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {activeTab === 'pending' ? (
                             pendingRequests.length > 0 ? (
@@ -195,7 +195,7 @@ export default function FriendsPage() {
                                         layout
                                         initial={{ opacity: 0, scale: 0.9 }}
                                         animate={{ opacity: 1, scale: 1 }}
-                                        className="bg-surface border border-glass-border rounded-2xl p-6 hover:border-primary/50 transition-all duration-300 group"
+                                        className="bg-surface border border-border rounded-3xl p-6 hover:border-gold/50 transition-all duration-300 group hover:shadow-lg"
                                     >
                                         <div className="flex items-start justify-between mb-4">
                                             <div className="flex items-center gap-4">
@@ -203,25 +203,25 @@ export default function FriendsPage() {
                                                     <img
                                                         src={req.sender.avatarUrl || `https://ui-avatars.com/api/?name=${req.sender.displayName}`}
                                                         alt={req.sender.displayName}
-                                                        className="w-14 h-14 rounded-full object-cover border-2 border-surface group-hover:border-primary transition-colors"
+                                                        className="w-14 h-14 rounded-full object-cover border-2 border-surface group-hover:border-gold transition-colors block bg-background"
                                                     />
                                                 </div>
                                                 <div>
                                                     <h3 className="font-bold text-lg text-text-primary">{req.sender.displayName}</h3>
-                                                    <p className="text-primary text-sm">@{req.sender.username}</p>
+                                                    <p className="text-gold text-sm font-medium">@{req.sender.username}</p>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="flex gap-2 mt-4">
                                             <button
                                                 onClick={() => handleRequestAction(req._id, 'accept')}
-                                                className="flex-1 bg-primary text-white py-2 rounded-lg font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
+                                                className="flex-1 bg-gold text-white py-2.5 rounded-xl font-bold hover:bg-gold-hover hover:shadow-gold-glow transition-all flex items-center justify-center gap-2"
                                             >
                                                 <Check size={18} /> Accept
                                             </button>
                                             <button
                                                 onClick={() => handleRequestAction(req._id, 'reject')}
-                                                className="flex-1 bg-surface border border-glass-border text-text-primary py-2 rounded-lg font-medium hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50 transition-all flex items-center justify-center gap-2"
+                                                className="flex-1 bg-surface border border-border text-text-secondary py-2.5 rounded-xl font-medium hover:bg-danger hover:text-white hover:border-danger hover:shadow-danger-glow transition-all flex items-center justify-center gap-2"
                                             >
                                                 <X size={18} /> Reject
                                             </button>
@@ -229,7 +229,7 @@ export default function FriendsPage() {
                                     </motion.div>
                                 ))
                             ) : (
-                                <div className="col-span-full text-center py-12 text-text-secondary">
+                                <div className="col-span-full text-center py-12 text-text-muted">
                                     No pending requests
                                 </div>
                             )
@@ -240,7 +240,7 @@ export default function FriendsPage() {
                                     layout
                                     initial={{ opacity: 0, scale: 0.9 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    className="bg-surface border border-glass-border rounded-2xl p-6 hover:border-primary/50 transition-all duration-300 group"
+                                    className="bg-surface border border-border rounded-3xl p-6 hover:border-orange/50 transition-all duration-300 group hover:shadow-lg"
                                 >
                                     <div className="flex items-start justify-between mb-4">
                                         <div className="flex items-center gap-4">
@@ -248,31 +248,31 @@ export default function FriendsPage() {
                                                 <img
                                                     src={friend.avatarUrl || `https://ui-avatars.com/api/?name=${friend.displayName}`}
                                                     alt={friend.displayName}
-                                                    className="w-14 h-14 rounded-full object-cover border-2 border-surface group-hover:border-primary transition-colors"
+                                                    className="w-14 h-14 rounded-full object-cover border-2 border-surface group-hover:border-orange transition-colors bg-background"
                                                 />
-                                                <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-surface ${friend.status === 'online' ? 'bg-green-500' :
-                                                    friend.status === 'in-call' ? 'bg-red-500' :
-                                                        'bg-gray-500'
+                                                <div className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-surface ${friend.status === 'online' ? 'bg-orange shadow-orange-glow' :
+                                                    friend.status === 'in-call' ? 'bg-danger' :
+                                                        'bg-text-muted'
                                                     }`} />
                                             </div>
                                             <div>
                                                 <h3 className="font-bold text-lg text-text-primary">{friend.displayName}</h3>
-                                                <p className="text-primary text-sm">@{friend.username}</p>
+                                                <p className="text-text-muted text-sm">@{friend.username}</p>
                                             </div>
                                         </div>
-                                        <button className="p-2 hover:bg-glass-bg rounded-lg text-text-secondary hover:text-primary transition-colors">
+                                        <button className="p-2 hover:bg-surface-hover rounded-full text-text-secondary hover:text-text-primary transition-colors">
                                             <MoreVertical size={20} />
                                         </button>
                                     </div>
 
-                                    <div className="flex items-center gap-4 text-sm text-text-secondary mb-6">
+                                    <div className="flex items-center gap-4 text-sm text-text-muted mb-6">
                                         <div className="flex items-center gap-1">
                                             <Users size={14} />
                                             <span>0 Mutual</span>
                                         </div>
                                         {friend.status === 'online' && (
-                                            <div className="flex items-center gap-1 text-green-500">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                            <div className="flex items-center gap-1 text-orange font-medium">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-orange animate-pulse" />
                                                 <span>Online</span>
                                             </div>
                                         )}
@@ -281,14 +281,14 @@ export default function FriendsPage() {
                                     <div className="grid grid-cols-2 gap-3">
                                         <button
                                             onClick={() => router.push(`/messages?userId=${friend._id}`)}
-                                            className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/10 text-primary font-medium hover:bg-primary hover:text-white transition-all duration-300"
+                                            className="flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-surface border border-border text-text-primary font-bold hover:border-gold hover:text-gold transition-all duration-300"
                                         >
                                             <MessageSquare size={18} />
                                             <span>Message</span>
                                         </button>
                                         <button
                                             onClick={() => router.push(`/call/private?userId=${friend._id}`)}
-                                            className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-surface border border-glass-border text-text-primary font-medium hover:border-primary/50 transition-all duration-300"
+                                            className="flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-orange text-white font-bold hover:bg-orange-hover hover:shadow-orange-glow transition-all duration-300"
                                         >
                                             <Video size={18} />
                                             <span>Call</span>

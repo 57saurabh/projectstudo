@@ -99,12 +99,12 @@ export default function MultiSelectDropdown({
 
     return (
         <div className="w-full relative" ref={dropdownRef}>
-            <label className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2 block">{label}</label>
+            <label className="text-xs font-bold text-text-secondary uppercase tracking-wider mb-2 block">{label}</label>
             
             {/* Trigger Area */}
             <div 
-                className={`min-h-[42px] w-full bg-black/20 border rounded-lg px-3 py-2 cursor-pointer transition-all flex items-center justify-between ${
-                    isOpen ? 'border-[#7f19e6] ring-1 ring-[#7f19e6]/50' : 'border-white/10 hover:border-white/30'
+                className={`min-h-[42px] w-full bg-surface-hover/50 border rounded-2xl px-4 py-3 cursor-pointer transition-all flex items-center justify-between shadow-sm ${
+                    isOpen ? 'border-gold ring-1 ring-gold/50' : 'border-border hover:border-gold/50'
                 }`}
                 onClick={() => setIsOpen(!isOpen)}
             >
@@ -116,7 +116,7 @@ export default function MultiSelectDropdown({
                                 return (
                                     <span 
                                         key={value} 
-                                        className="px-2 py-1 rounded-full bg-[#7f19e6]/20 border border-[#7f19e6]/30 text-[#7f19e6] text-xs flex items-center gap-1 animate-in zoom-in-95 duration-200"
+                                        className="px-2.5 py-1 rounded-full bg-gold/10 border border-gold/30 text-gold text-xs font-bold flex items-center gap-1.5 animate-in zoom-in-95 duration-200"
                                     >
                                         {option?.flag && (
                                             <div className="w-4 h-3 relative shrink-0">
@@ -132,7 +132,7 @@ export default function MultiSelectDropdown({
                                         <div 
                                             role="button"
                                             onMouseDown={(e) => removeValue(value, e)} 
-                                            className="hover:text-white transition-colors"
+                                            className="hover:text-text-primary transition-colors"
                                         >
                                             <X size={12} />
                                         </div>
@@ -141,42 +141,42 @@ export default function MultiSelectDropdown({
                             })}
                             {extraCount > 0 && (
                                 <div className="relative group">
-                                    <span className="px-2 py-1 rounded-full bg-white/10 text-white/70 text-xs border border-white/10 hover:bg-white/20 transition-colors">
+                                    <span className="px-2.5 py-1 rounded-full bg-surface-hover text-text-muted text-xs font-bold border border-border hover:bg-surface-hover/80 transition-colors">
                                         +{extraCount} more
                                     </span>
                                     {/* Tooltip for extra items */}
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] bg-black/90 border border-white/10 rounded-lg p-2 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 flex flex-col gap-1">
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] bg-background border border-border rounded-xl p-3 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 flex flex-col gap-1">
                                          {selectedValues.slice(limit).map(val => (
-                                             <span key={val} className="text-xs text-white/80 block truncate">{val}</span>
+                                             <span key={val} className="text-xs text-text-secondary block truncate font-medium">{val}</span>
                                          ))}
                                     </div>
                                 </div>
                             )}
                         </>
                     ) : (
-                        <span className="text-white/30 text-sm truncate">{placeholder}</span>
+                        <span className="text-text-muted text-sm truncate font-medium">{placeholder}</span>
                     )}
                 </div>
-                <ChevronDown size={16} className={`text-white/50 transition-transform duration-300 ml-2 shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown size={16} className={`text-text-muted transition-transform duration-300 ml-2 shrink-0 ${isOpen ? 'rotate-180 text-gold' : ''}`} />
             </div>
 
             {/* Dropdown Panel */}
             {isOpen && (
-                <div className="absolute z-50 mt-2 w-full min-w-[300px] bg-[#191121] border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute z-50 mt-2 w-full min-w-[300px] bg-surface border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                    
                    {/* Search Input */}
-                   <div className="p-2 border-b border-white/10 sticky top-0 bg-[#191121] z-10">
+                   <div className="p-3 border-b border-border sticky top-0 bg-surface z-10">
                        <input 
                            autoFocus
                            type="text" 
                            placeholder="Search..." 
                            value={searchQuery}
                            onChange={(e) => setSearchQuery(e.target.value)}
-                           className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:border-[#7f19e6] outline-none placeholder:text-white/20"
+                           className="w-full bg-surface-hover border border-border rounded-xl px-4 py-2 text-sm text-text-primary focus:border-gold outline-none placeholder:text-text-muted font-medium transition-colors"
                        />
                    </div>
 
-                   <div className="h-[280px] overflow-y-auto custom-scrollbar p-2">
+                   <div className="h-[280px] overflow-y-auto scrollbar-hide p-3">
                         <div className="grid grid-cols-2 gap-2">
                             {filteredOptions.length > 0 ? (
                                 filteredOptions.map((option) => {
@@ -186,10 +186,10 @@ export default function MultiSelectDropdown({
                                             key={option.value}
                                             onClick={() => toggleOption(option)}
                                             className={`
-                                                relative flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all border group
+                                                relative flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-all border group
                                                 ${isSelected 
-                                                    ? 'bg-[#7f19e6]/10 border-[#7f19e6] shadow-[0_0_10px_rgba(127,25,230,0.1)]' 
-                                                    : 'bg-white/5 border-transparent hover:bg-white/10 hover:border-white/10'
+                                                    ? 'bg-gold/10 border-gold/50 shadow-sm' 
+                                                    : 'bg-surface-hover/30 border-transparent hover:bg-surface-hover hover:border-border'
                                                 }
                                             `}
                                         >
@@ -205,7 +205,7 @@ export default function MultiSelectDropdown({
                                             </div>
                                             
                                             <div className="flex flex-col min-w-0 flex-1">
-                                                <span className={`text-sm font-medium truncate ${isSelected ? 'text-white' : 'text-white/70'}`}>
+                                                <span className={`text-sm font-bold truncate ${isSelected ? 'text-gold' : 'text-text-secondary group-hover:text-text-primary'}`}>
                                                     {option.label}
                                                 </span>
                                             </div>
@@ -215,7 +215,7 @@ export default function MultiSelectDropdown({
                                                     <div 
                                                         role="button"
                                                         onClick={(e) => removeValue(option.value, e)}
-                                                        className="bg-white/10 hover:bg-red-500/20 hover:text-red-400 text-white/50 rounded-full p-1 transition-colors z-10"
+                                                        className="bg-surface hover:bg-danger/20 hover:text-danger text-text-muted rounded-full p-1 transition-colors z-10"
                                                         title="Remove"
                                                     >
                                                         <X size={12} />
@@ -226,7 +226,7 @@ export default function MultiSelectDropdown({
                                     );
                                 })
                             ) : (
-                                <div className="col-span-2 py-4 text-center text-white/30 text-xs">
+                                <div className="col-span-2 py-8 text-center text-text-muted text-sm font-medium">
                                     No results found
                                 </div>
                             )}
@@ -234,7 +234,7 @@ export default function MultiSelectDropdown({
                    </div>
                    
                    {/* Footer/Hint - Optional */}
-                   <div className="px-3 py-2 bg-white/5 border-t border-white/5 text-[10px] text-white/30 flex justify-between">
+                   <div className="px-4 py-3 bg-surface-hover/50 border-t border-border text-[10px] text-text-muted flex justify-between font-bold uppercase tracking-wider">
                         <span>{selectedValues.length} selected</span>
                        {/* <span>Scroll for more</span> */}
                    </div>

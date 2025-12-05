@@ -16,10 +16,10 @@ export default function VideoGrid({ participants, remoteStreams, callState }: Vi
     };
 
     return (
-        <div className={`absolute inset-0 w-full h-full bg-[#1a1a1a] p-4 grid gap-4 ${getGridClass()} auto-rows-fr ${callState === 'proposed' ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
+        <div className={`absolute inset-0 w-full h-full bg-surface-hover/20 p-4 grid gap-4 ${getGridClass()} auto-rows-fr ${callState === 'proposed' ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
             {participants.length > 0 ? (
                 participants.map((participant) => (
-                    <div key={participant.id} className="relative w-full h-full bg-black rounded-lg overflow-hidden flex items-center justify-center border border-white/10 group">
+                    <div key={participant.id} className="relative w-full h-full bg-surface rounded-2xl overflow-hidden flex items-center justify-center border border-border group hover:border-gold/50 transition-colors">
                         {/* Remote Video Element */}
                         <RemoteVideo
                             stream={remoteStreams[participant.id]}
@@ -31,20 +31,20 @@ export default function VideoGrid({ participants, remoteStreams, callState }: Vi
 
                         {/* Reputation Badge */}
                         {participant.reputation !== undefined && (
-                            <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-yellow-500/30 flex items-center gap-2 z-20">
-                                <span className="text-yellow-400 text-xs font-bold">★ {participant.reputation}</span>
+                            <div className="absolute top-4 left-4 bg-surface/80 backdrop-blur-md px-3 py-1 rounded-full border border-gold/50 flex items-center gap-2 z-20 shadow-gold-glow">
+                                <span className="text-gold text-xs font-bold">★ {participant.reputation}</span>
                             </div>
                         )}
 
-                        <div className="absolute bottom-4 left-4 text-white font-medium z-20 bg-black/50 px-2 py-1 rounded backdrop-blur-sm">
+                        <div className="absolute bottom-4 left-4 text-white font-bold tracking-wide z-20 bg-surface/60 px-3 py-1 rounded-full backdrop-blur-sm border border-white/5">
                             {participant.displayName}
                         </div>
                     </div>
                 ))
             ) : (
                 <div className="flex flex-col items-center justify-center h-full gap-4">
-                    <div className="animate-spin w-8 h-8 border-4 border-[#7f19e6] border-t-transparent rounded-full"></div>
-                    <p className="text-white/50">Searching for a match...</p>
+                    <div className="animate-spin w-12 h-12 border-4 border-gold border-t-transparent rounded-full shadow-gold-glow"></div>
+                    <p className="text-text-muted font-medium animate-pulse">Searching for someone specifically for you...</p>
                 </div>
             )}
         </div>

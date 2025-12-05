@@ -1,75 +1,130 @@
 'use client';
 
-import { Settings as SettingsIcon, Bell, Shield, User, Volume2, Moon, Sun, ChevronRight } from 'lucide-react';
+import { Settings as SettingsIcon, Bell, Shield, User, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
-import { useTheme } from '@/lib/context/ThemeContext';
+import { useState } from 'react';
+import Toggle from '@/components/ui/Toggle';
 
 export default function SettingsPage() {
-    const { theme, toggleTheme } = useTheme();
+    const [notifications, setNotifications] = useState({
+        push: true,
+        email: false
+    });
+
+    const [privacy, setPrivacy] = useState({
+        friendRequests: true,
+        onlineStatus: true
+    });
 
     return (
-        <div className="p-6 lg:p-10 min-h-screen text-text-primary max-w-4xl mx-auto transition-colors duration-300">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold">Settings</h1>
-                <p className="text-text-secondary">Manage your preferences</p>
+        <div className="p-6 lg:p-10 min-h-screen bg-background text-text-primary max-w-4xl mx-auto transition-colors duration-300">
+            <div className="mb-10">
+                <h1 className="text-4xl font-black tracking-tighter mb-2 text-white">Settings</h1>
+                <p className="text-text-muted font-medium">Manage your preferences and privacy</p>
             </div>
 
             <div className="space-y-6">
-                {/* Account Section */}
-                {/* Account Section */}
+                {/* Account Section Link */}
                 <Link href="/settings/profile" className="block group">
-                    <section className="bg-surface border border-glass-border rounded-2xl overflow-hidden transition-all duration-300 hover:border-primary/50">
-                        <div className="p-6 flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                                    <User size={24} />
+                    <section className="bg-surface border border-border rounded-3xl overflow-hidden transition-all duration-300 hover:border-gold/50 hover:shadow-lg hover:shadow-gold/5 group-hover:-translate-y-1">
+                        <div className="p-8 flex items-center justify-between">
+                            <div className="flex items-center gap-6">
+                                <div className="w-16 h-16 rounded-2xl bg-gold/10 flex items-center justify-center text-gold shadow-gold-glow group-hover:scale-110 transition-transform duration-300">
+                                    <User size={32} />
                                 </div>
                                 <div>
-                                    <h2 className="text-xl font-bold">Account Settings</h2>
-                                    <p className="text-text-secondary">Manage your profile details and visibility</p>
+                                    <h2 className="text-2xl font-bold mb-1 group-hover:text-gold transition-colors text-white">Account Settings</h2>
+                                    <p className="text-text-muted font-medium">Manage your profile details and visibility</p>
                                 </div>
                             </div>
-                            <ChevronRight className="text-text-secondary group-hover:text-primary transition-colors" size={24} />
+                            <div className="w-12 h-12 rounded-full bg-surface-hover flex items-center justify-center group-hover:bg-gold group-hover:text-white transition-all shadow-sm border border-border group-hover:border-gold">
+                                <ChevronRight size={24} />
+                            </div>
                         </div>
                     </section>
                 </Link>
 
                 {/* Notifications */}
-                <section className="bg-surface border border-glass-border rounded-2xl overflow-hidden transition-colors duration-300">
-                    <div className="p-6 border-b border-glass-border">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            <Bell size={20} className="text-primary" />
+                <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
+                    <div className="p-6 border-b border-border bg-surface-hover/30">
+                        <h2 className="text-xl font-bold flex items-center gap-3 text-white">
+                            <Bell size={24} className="text-gold" />
                             Notifications
                         </h2>
                     </div>
-                    <div className="p-6 space-y-4">
+                    <div className="p-8 space-y-8">
                         <div className="flex items-center justify-between">
-                            <p className="font-medium">Push Notifications</p>
-                            <div className="w-12 h-6 bg-primary rounded-full relative cursor-pointer">
-                                <div className="absolute right-1 top-1 w-4 h-4 bg-white rounded-full" />
+                            <div>
+                                <p className="font-bold text-lg text-text-primary">Push Notifications</p>
+                                <p className="text-sm text-text-muted font-medium">Receive alerts for messages and calls</p>
                             </div>
+                            <Toggle 
+                                checked={notifications.push} 
+                                onChange={(val) => setNotifications(prev => ({ ...prev, push: val }))} 
+                            />
+                        </div>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="font-bold text-lg text-text-primary">Email Updates</p>
+                                <p className="text-sm text-text-muted font-medium">Get weekly digests and announcements</p>
+                            </div>
+                            <Toggle 
+                                checked={notifications.email} 
+                                onChange={(val) => setNotifications(prev => ({ ...prev, email: val }))} 
+                            />
                         </div>
                     </div>
                 </section>
 
-                {/* Appearance */}
-                <section className="bg-surface border border-glass-border rounded-2xl overflow-hidden transition-colors duration-300">
-                    <div className="p-6 border-b border-glass-border">
-                        <h2 className="text-xl font-bold flex items-center gap-2">
-                            {theme === 'dark' ? <Moon size={20} className="text-primary" /> : <Sun size={20} className="text-primary" />}
-                            Appearance
+                {/* Privacy & Safety */}
+                <section className="bg-surface border border-border rounded-3xl overflow-hidden shadow-sm">
+                    <div className="p-6 border-b border-border bg-surface-hover/30">
+                        <h2 className="text-xl font-bold flex items-center gap-3 text-white">
+                            <Shield size={24} className="text-orange" />
+                            Privacy & Safety
                         </h2>
                     </div>
-                    <div className="p-6 space-y-4">
+                    <div className="p-8 space-y-8">
                         <div className="flex items-center justify-between">
-                            <p className="font-medium">Dark Mode</p>
-                            <div 
-                                onClick={toggleTheme}
-                                className={`w-12 h-6 rounded-full relative cursor-pointer transition-colors duration-300 ${theme === 'dark' ? 'bg-primary' : 'bg-gray-400'}`}
-                            >
-                                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all duration-300 ${theme === 'dark' ? 'right-1' : 'left-1'}`} />
+                            <div>
+                                <p className="font-bold text-lg text-text-primary">Allow Friend Requests</p>
+                                <p className="text-sm text-text-muted font-medium">Let others send you friend requests</p>
                             </div>
+                            <Toggle 
+                                checked={privacy.friendRequests} 
+                                onChange={(val) => setPrivacy(prev => ({ ...prev, friendRequests: val }))}
+                                activeColor="gold"
+                            />
                         </div>
+                         <div className="flex items-center justify-between">
+                            <div>
+                                <p className="font-bold text-lg text-text-primary">Online Status</p>
+                                <p className="text-sm text-text-muted font-medium">Show when you are active</p>
+                            </div>
+                            <Toggle 
+                                checked={privacy.onlineStatus} 
+                                onChange={(val) => setPrivacy(prev => ({ ...prev, onlineStatus: val }))}
+                                activeColor="green"
+                            />
+                        </div>
+                        <div className="pt-6 border-t border-border">
+                             <button className="text-orange font-bold hover:text-orange-hover flex items-center gap-2 transition-colors px-4 py-2 rounded-xl hover:bg-orange/10 -ml-4">
+                                Manage Blocked Users <ChevronRight size={16} />
+                             </button>
+                        </div>
+                    </div>
+                </section>
+
+                 {/* Danger Zone */}
+                 <section className="bg-danger/5 border border-danger/20 rounded-3xl overflow-hidden mt-8 transition-colors hover:bg-danger/10 hover:border-danger/30">
+                    <div className="p-8 flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                            <h2 className="text-xl font-bold text-danger mb-1">Delete Account</h2>
+                            <p className="text-danger/70 text-sm font-medium">Permanently remove your account and data</p>
+                        </div>
+                        <button className="px-6 py-3 bg-danger text-white rounded-2xl font-bold hover:bg-danger-hover shadow-danger-glow transition-all active:scale-95 border border-danger/20">
+                            Delete Account
+                        </button>
                     </div>
                 </section>
             </div>
