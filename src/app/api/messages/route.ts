@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { ConversationModel } from '@backend/src/models/Conversation';
-import { UserModel } from '@/models/User';
+import { UserModel } from '@/models/User.schema';
 import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super-secret-key';

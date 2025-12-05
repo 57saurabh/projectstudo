@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
 import { ConversationModel } from '@backend/src/models/Conversation';
-import { UserModel } from '@/models/User';
+import { UserModel } from '@/models/User.schema';
 import { FriendRequestModel } from '@backend/src/models/FriendRequest';
 import jwt from 'jsonwebtoken';
 
