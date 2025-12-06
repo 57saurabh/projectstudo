@@ -8,7 +8,7 @@ import { useRef, useEffect } from 'react';
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
-    const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/';
+    const isAuthPage = pathname === '/login' || pathname === '/signup' || pathname === '/promotionals';
     const { isOpen } = useSidebar();
     const mainRef = useRef<HTMLElement>(null);
 
@@ -19,18 +19,20 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     }, [pathname]);
 
     return (
-        <div className="flex min-h-screen bg-background overflow-hidden transition-colors duration-300">
+        <div className="flex h-screen bg-background overflow-hidden transition-colors duration-300">
             {!isAuthPage && <Sidebar />}
-            <main
-                ref={mainRef}
-                className={`flex-1 transition-all duration-300 ease-in-out h-screen overflow-y-auto flex flex-col ${!isAuthPage ? 'w-full' : ''
-                    }`}
-            >
+            <div className="flex flex-col flex-1 h-screen overflow-hidden">
                 {!isAuthPage && <Header />}
-                <div className="flex-1 p-2 lg:p-4">
-                    {children}
-                </div>
-            </main>
+                <main
+                    ref={mainRef}
+                    className={`flex-1 overflow-y-auto transition-all duration-300 ease-in-out flex flex-col ${!isAuthPage ? 'w-full' : ''
+                        }`}
+                >
+                    <div className="flex-1 p-2 lg:p-4">
+                        {children}
+                    </div>
+                </main>
+            </div>
         </div>
     );
 }

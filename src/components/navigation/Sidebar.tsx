@@ -15,8 +15,10 @@ import {
     X,
     Ghost,
     ChevronRight,
+    Compass,
+    User
 } from 'lucide-react';
-import { useDispatch } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '@/lib/store/authSlice';
 import { useRouter } from 'next/navigation';
 import { useSidebar } from '@/components/layout/SidebarContext';
@@ -28,6 +30,7 @@ export default function Sidebar() {
     const dispatch = useDispatch();
     const router = useRouter();
     const { unreadCount } = useSignaling();
+    const { user } = useSelector((state: any) => state.auth);
 
     const handleLogout = () => {
         dispatch(logout() as any);
@@ -35,11 +38,13 @@ export default function Sidebar() {
     };
 
     const navItems = [
-        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { name: 'Home', href: '/', icon: LayoutDashboard },
         { name: 'Random Chat', href: '/call/pre-check', icon: Ghost },
-        { name: 'Friends', href: '/friends', icon: Users },
+
         { name: 'Groups', href: '/groups', icon: Video },
+        { name: 'Discover', href: '/discover', icon: Compass },
         { name: 'Messages', href: '/messages', icon: MessageSquare },
+        { name: 'Profile', href: `/profile/${user?.username}`, icon: User },
 
     ];
 
@@ -75,41 +80,33 @@ export default function Sidebar() {
                 className={`relative h-[calc(100vh-2rem)] m-4 bg-surface border border-border z-40 hidden lg:flex flex-col transition-all duration-300 ease-in-out flex-shrink-0 rounded-[2.5rem] shadow-2xl`}
             >
                 {/* Header / Logo */}
-                <div className="h-28 flex items-center px-8">
-                    <div className="flex items-center gap-5 overflow-hidden w-full">
-                        <motion.div
-                            whileHover={{ scale: 1.05, rotate: 5 }}
-                            whileTap={{ scale: 0.95 }}
-                            className="w-14 h-14 bg-gold rounded-2xl flex items-center justify-center font-black text-2xl text-primary flex-shrink-0 shadow-gold-glow cursor-pointer"
-                        >
-                            Z
-                        </motion.div>
+                <div className="h-28 flex items-center relative">
+                    <div className="flex items-center gap-5 w-full">
+                        {!isOpen && (
+                            <span className='w-16 h-16 flex items-center justify-center ml-4'>
+                                <img src="/logomain.png" alt="Socialin" className="w-full h-full object-contain" />
+                            </span>)}
                         <AnimatePresence>
                             {isOpen && (
-                                <motion.div
-                                    initial={{ opacity: 0, x: -10 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -10 }}
-                                    className="flex-1 flex items-center justify-between overflow-hidden"
+                                <span className=" h-24 flex-1 flex items-center justify-between overflow-hidden"
                                 >
-                                    <span className="font-black text-3xl tracking-tighter text-text-primary whitespace-nowrap ml-2">
-                                        Zylo
-                                    </span>
-                                </motion.div>
+                                    <img src="/logo.png" alt="Socialin" className="w-full h-full object-contain" />
+
+                                </span>
                             )}
                         </AnimatePresence>
                     </div>
                 </div>
 
-                {/* Toggle Button Row */}
-                <div className="flex items-center justify-center py-2 mb-4">
-                    <button
-                        onClick={toggleSidebar}
-                        className="p-2.5 rounded-xl text-text-muted hover:bg-surface-hover hover:text-gold transition-all hover:scale-110 active:scale-95"
-                    >
-                        {isOpen ? <ChevronRight size={22} className="rotate-180" /> : <ChevronRight size={22} />}
-                    </button>
-                </div>
+                {/* Absolute Toggle Button */}
+                <button
+                    onClick={toggleSidebar}
+                    className="absolute -right-3 top-11 w-6 h-6 bg-surface border border-border rounded-full flex items-center justify-center shadow-md z-50 cursor-pointer hover:scale-110 transition-transform text-text-muted hover:text-gold"
+                >
+                    <ChevronRight size={14} className={`transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+
 
                 {/* Navigation Links */}
                 <nav className="flex-1 px-5 space-y-4 overflow-y-auto flex flex-col scrollbar-hide">
@@ -197,10 +194,10 @@ export default function Sidebar() {
             >
                 <div className="h-28 flex items-center px-8 justify-between bg-surface-hover/50">
                     <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gold rounded-2xl flex items-center justify-center font-black text-xl text-primary shadow-gold-glow">
-                            Z
+                        <div className="w-12 h-12 flex items-center justify-center">
+                            <img src="/logo.png" alt="Socialin" className="w-full h-full object-contain" />
                         </div>
-                        <span className="font-black text-2xl text-text-primary tracking-tighter">Zylo</span>
+                        <span className="font-black text-2xl text-text-primary tracking-tighter">Socialin</span>
                     </div>
                     <button
                         onClick={closeSidebar}
@@ -224,7 +221,7 @@ export default function Sidebar() {
                                     }`}
                             >
                                 <item.icon size={26} />
-                                <span className="ml-5 font-bold text-lg">{item.name}</span>
+                                <span className="text-xl font-bold tracking-tight">{item.name}</span>
                             </Link>
                         );
                     })}

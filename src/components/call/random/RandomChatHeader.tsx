@@ -9,10 +9,12 @@ export default function RandomChatHeader({ user }: RandomChatHeaderProps) {
     return (
         <header className="flex items-center justify-between whitespace-nowrap border-b border-border px-6 py-3 bg-surface z-10 shadow-sm">
             <div className="flex items-center gap-4 text-text-primary">
-                <div className="w-10 h-10 bg-gold rounded-full flex items-center justify-center font-black text-xl text-white shadow-gold-glow">Z</div>
-                <h2 className="text-xl font-bold tracking-tight">Zylo</h2>
+                <div className="w-10 h-10 flex items-center justify-center">
+                    <img src="/logo.png" alt="Socialin" className="w-full h-full object-contain" />
+                </div>
+                <h2 className="text-xl font-bold tracking-tight">Socialin</h2>
             </div>
-            
+
             <div className="hidden md:flex flex-1 justify-center items-center gap-4">
                 {['#Vibes', '#Music', '#Gaming', '#LateNight'].map((tag) => (
                     <span key={tag} className="px-3 py-1 bg-surface-hover border border-border rounded-full text-xs font-medium text-text-muted hover:border-gold hover:text-gold cursor-pointer transition-all">
@@ -33,7 +35,7 @@ export default function RandomChatHeader({ user }: RandomChatHeaderProps) {
                         {user?.avatarUrl ? (
                             <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
                         ) : (
-                             <span className="font-bold text-sm text-gold">{user?.displayName?.[0] || 'U'}</span>
+                            <span className="font-bold text-sm text-gold">{user?.displayName?.[0] || 'U'}</span>
                         )}
                     </div>
                 </div>

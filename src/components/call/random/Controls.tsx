@@ -88,7 +88,7 @@ export default function Controls({
                 <div className="w-px h-8 bg-border mx-1"></div>
 
                 {/* End Call */}
-                <Link href="/dashboard">
+                <Link href="/">
                     <button className={dangerButton}>
                         <PhoneOff size={20} />
                     </button>

@@ -1,5 +1,5 @@
 {
-  "name": "my-project",
+  "name": "socialin-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,12 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@react-oauth/google": "^0.12.2",
     "@reduxjs/toolkit": "^2.11.0",
     "@tensorflow/tfjs": "^4.22.0",
     "@vladmandic/face-api": "^1.7.15",
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
     "framer-motion": "^12.23.24",
+    "google-auth-library": "^10.5.0",
     "jsonwebtoken": "^9.0.2",
     "lucide-react": "^0.555.0",
     "mongoose": "^9.0.0",
@@ -25,6 +27,7 @@
     "react-redux": "^9.2.0",
     "socket.io-client": "^4.8.1",
     "sonner": "^2.0.7",
+    "unique-names-generator": "^4.7.1",
     "uuid": "^13.0.0",
     "zustand": "^5.0.9"
   },

@@ -15,6 +15,7 @@ export class UsersController {
 
     private initializeRoutes() {
         this.router.get('/search', this.searchUsers);
+        this.router.get('/username/:username', this.getUserByUsername);
         this.router.get('/:id', this.getUserProfile);
         this.router.put('/me', this.updateProfile); // Added update route
     }
@@ -43,6 +44,15 @@ export class UsersController {
         }
     };
 
+    private getUserByUsername = async (req: express.Request, res: express.Response) => {
+        try {
+            const user = await this.usersService.getUserByUsername(req.params.username);
+            res.json(user);
+        } catch (error: any) {
+            res.status(404).json({ message: error.message });
+        }
+    };
+
     private updateProfile = async (req: express.Request, res: express.Response) => {
         try {
             const userId = this.getUserIdFromToken(req);
@@ -53,7 +63,8 @@ export class UsersController {
             const allowedUpdates = [
                 'displayName', 'username', 'bio', 'website', 'profession',
                 'gender', 'age', 'country', 'region', 'university',
-                'interests', 'languages', 'languageCountries', 'avatarUrl', 'theme'
+                'interests', 'languages', 'languageCountries', 'avatarUrl', 'theme',
+                'preferences', 'privacy'
             ];
 
             const updates = Object.keys(req.body)

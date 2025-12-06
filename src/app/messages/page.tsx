@@ -482,7 +482,7 @@ export default function MessagesPage() {
     };
 
     return (
-        <div className="p-4 lg:p-8 h-screen bg-background text-text-primary flex flex-col transition-colors duration-300 overflow-hidden">
+        <div className="p-4 lg:p-8 h-full bg-background text-text-primary flex flex-col transition-colors duration-300 overflow-hidden">
             <div className="mb-4 flex justify-between items-center">
                 <h1 className="text-3xl font-black tracking-tighter">Messages</h1>
                 <button

@@ -31,7 +31,7 @@ export default function ChatArea({
     if (!showChat) return null;
 
     return (
-        <div className="w-full lg:w-[360px] flex-shrink-0 flex flex-col bg-surface rounded-3xl overflow-hidden border border-border h-[300px] lg:h-auto transition-all duration-300">
+        <div className="w-full lg:w-[360px] flex-shrink-0 flex flex-col bg-surface rounded-3xl overflow-hidden border border-border h-[35vh] min-h-[250px] lg:h-auto transition-all duration-300">
             <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto">
                 {messages.map((msg, idx) => (
                     <div key={idx} className={`flex items-end gap-3 ${msg.senderId === user?.id ? 'justify-end' : ''}`}>
@@ -41,10 +41,10 @@ export default function ChatArea({
                         <div className={`flex flex-col gap-1 ${msg.senderId === user?.id ? 'items-end' : 'items-start'} ${msg.isSystem ? 'w-full items-center' : ''}`}>
                             {!msg.isSystem && <p className="text-text-muted text-[13px] font-medium">{msg.senderName}</p>}
                             <div className={`max-w-[240px] rounded-2xl px-4 py-2 text-sm font-medium ${msg.isSystem
-                                    ? 'bg-surface-hover text-text-muted text-xs text-center italic'
-                                    : (msg.senderId === user?.id
-                                        ? 'bg-gold text-primary shadow-gold-glow'
-                                        : 'bg-accent-cream text-black')
+                                ? 'bg-surface-hover text-text-muted text-xs text-center italic'
+                                : (msg.senderId === user?.id
+                                    ? 'bg-gold text-primary shadow-gold-glow'
+                                    : 'bg-accent-cream text-black')
                                 }`}>
                                 {msg.text}
                             </div>

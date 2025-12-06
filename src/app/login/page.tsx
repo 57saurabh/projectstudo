@@ -1,11 +1,13 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useDispatch, useSelector } from 'react-redux';
 import { login, signup } from '@/lib/store/authSlice';
 import { AppDispatch, RootState } from '@/lib/store/store';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import Input from '@/components/ui/Input';
+import { GoogleLogin } from '@react-oauth/google';
 
 export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true);
@@ -14,7 +16,11 @@ export default function AuthPage() {
         email: '',
         password: '',
         confirmPassword: '',
+        displayName: '', // Kept for type compatibility but unused in UI
+        username: ''     // Kept for type compatibility but unused in UI
     });
+
+    // Removed username validation and suggestion effects as fields are removed
 
     const dispatch = useDispatch<AppDispatch>();
     const router = useRouter();
@@ -30,11 +36,13 @@ export default function AuthPage() {
         const action = isLogin ? login : signup;
         const result = await dispatch(action({
             email: formData.email,
-            password: formData.password
+            password: formData.password,
+            displayName: !isLogin ? formData.displayName : undefined,
+            username: !isLogin ? formData.username : undefined
         }));
 
         if (login.fulfilled.match(result) || signup.fulfilled.match(result)) {
-            router.push('/dashboard');
+            router.push('/');
         }
     };
 
@@ -46,8 +54,10 @@ export default function AuthPage() {
             <div className="relative z-10 w-full max-w-md flex flex-col items-center px-4 sm:px-0">
                 {/* Logo */}
                 <div className="mb-8 flex items-center gap-3">
-                    <div className="w-12 h-12 bg-gold rounded-full flex items-center justify-center text-primary font-black text-2xl shadow-gold-glow">Z</div>
-                    <h1 className="text-4xl font-black text-text-primary tracking-tighter">Zylo</h1>
+                    <div className="h-16 flex items-center justify-center">
+                        <img src="/logo.png" alt="Socialin" className="w-full h-full object-contain" />
+                    </div>
+
                 </div>
 
                 {/* Card */}
@@ -81,12 +91,18 @@ export default function AuthPage() {
                     <form onSubmit={handleSubmit} className="space-y-5">
                         {error && <div className="text-danger text-sm font-bold text-center bg-danger/10 p-3 rounded-xl border border-danger/20">{error}</div>}
 
+                        {!isLogin && (
+                            // Username and DisplayName are now auto-generated
+                            // User can change them in profile settings
+                            null
+                        )}
+
                         <Input
-                            label="Email"
+                            label="Email Address"
                             type="email"
                             required
                             autoComplete="email"
-                            placeholder="Enter your email"
+                            placeholder="name@example.com"
                             value={formData.email}
                             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                         />
@@ -126,9 +142,42 @@ export default function AuthPage() {
                             disabled={loading}
                             className="w-full bg-gold hover:bg-gold-hover text-primary font-black py-4 rounded-2xl shadow-gold-glow transition-all transform hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed mt-8 uppercase tracking-wide"
                         >
-                            {loading ? 'Loading...' : (isLogin ? 'Login to Zylo' : 'Join Zylo')}
+                            {loading ? 'Loading...' : (isLogin ? 'Login to Socialin' : 'Join Socialin')}
                         </button>
                     </form>
+
+                    <div className="mt-8 relative">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-border"></div>
+                        </div>
+                        <div className="relative flex justify-center text-sm">
+                            <span className="px-2 bg-surface text-text-muted">Or continue with</span>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex justify-center">
+                        <GoogleLogin
+                            onSuccess={async (credentialResponse) => {
+                                try {
+                                    const res = await axios.post('/api/auth/google', {
+                                        credential: credentialResponse.credential
+                                    });
+                                    dispatch(login.fulfilled(res.data, 'google-login', { email: '', password: '' }));
+                                    router.push('/');
+                                } catch (err) {
+                                    console.error('Google Login Failed', err);
+                                    alert('Google Login Failed');
+                                }
+                            }}
+                            onError={() => {
+                                console.log('Login Failed');
+                            }}
+                            theme="filled_black"
+                            shape="pill"
+                            text="continue_with"
+                            width="300"
+                        />
+                    </div>
 
                     <div className="mt-8 flex items-center justify-center gap-2 text-xs text-text-muted font-medium">
                         <div className="w-2 h-2 bg-gold rounded-full shadow-gold-glow" />

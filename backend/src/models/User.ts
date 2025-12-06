@@ -5,9 +5,11 @@ import mongoose, { Schema, Document, Model } from "mongoose";
    ============================================================ */
 
 export interface IProfession {
-    title: string;
+    type: string;
     company?: string;
     university?: string;
+    hospital?: string;
+    occupationPlace?: string;
 }
 
 export interface IConnectedAccount {
@@ -156,6 +158,14 @@ export interface UserDocument extends IUser, Document {
    4. MONGOOSE SCHEMA
    ============================================================ */
 
+const ProfessionSchema = new Schema({
+    type: { type: String, required: true },
+    company: { type: String },
+    university: { type: String },
+    hospital: { type: String },
+    occupationPlace: { type: String }
+}, { _id: false });
+
 const UserSchema = new Schema<UserDocument>(
     {
         email: { type: String, required: true, unique: true },
@@ -171,11 +181,7 @@ const UserSchema = new Schema<UserDocument>(
 
         bio: { type: String, default: "" },
         website: { type: String, default: "" },
-        profession: {
-            title: { type: String, default: "" },
-            company: { type: String },
-            university: { type: String }
-        },
+        profession: { type: ProfessionSchema, default: {} },
         isVerified: { type: Boolean, default: false },
         category: { type: String },
 

@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { remoteAiService } from '@/lib/ai/RemoteAiService';
 
 // Components
-import RandomChatHeader from '@/components/call/random/RandomChatHeader';
+// import RandomChatHeader from '@/components/call/random/RandomChatHeader';
 import IncomingInvite from '@/components/call/random/IncomingInvite';
 import InviteUserModal from '@/components/call/random/InviteUserModal';
 import MatchOverlay from '@/components/call/random/MatchOverlay';
@@ -244,11 +244,11 @@ export default function RandomChatPage() {
     };
 
     return (
-        <div className="relative flex h-screen w-full flex-col bg-background font-sans overflow-hidden text-text-primary">
+        <div className="relative flex h-full w-full flex-col bg-background font-sans overflow-hidden text-text-primary">
             {/* Hidden Video for Analysis */}
             <video ref={analysisVideoRef} className="hidden" muted playsInline />
 
-            <RandomChatHeader user={user} />
+            {/* <RandomChatHeader user={user} /> */}
 
             <IncomingInvite
                 pendingInvite={pendingInvite}

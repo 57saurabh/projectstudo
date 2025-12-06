@@ -35,7 +35,7 @@ export default function Header() {
     };
 
     const getPageTitle = (path: string) => {
-        if (path.includes('/dashboard')) return 'Dashboard';
+        if (path === '/') return 'Home';
         if (path.includes('/call/pre-check')) return 'Random Chat';
         if (path.includes('/call/private')) return 'Private Call';
         if (path.includes('/call/group')) return 'Group Call';
@@ -44,7 +44,7 @@ export default function Header() {
         if (path.includes('/groups')) return 'Groups';
         if (path.includes('/messages')) return 'Messages';
         if (path.includes('/settings')) return 'Settings';
-        return 'Zylo';
+        return 'Socialin';
     };
 
     const title = getPageTitle(pathname);
@@ -57,22 +57,23 @@ export default function Header() {
         >
             {/* Left: Title / Breadcrumbs */}
             <div className="flex items-center gap-4">
-                <h1 className="text-2xl font-black tracking-tight text-primary">
-                    {title}
-                </h1>
+                {pathname === '/' ? (
+                    <div className="flex flex-col">
+                        <h1 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2">
+                            Hey, <span className="text-gold">{user?.username || 'Stranger'}</span>
+                        </h1>
+                        <p className="text-xs text-text-secondary font-medium">Ready to cause some chaos?</p>
+                    </div>
+                ) : (
+                    <h1 className="text-2xl font-black tracking-tight text-primary">
+                        {title}
+                    </h1>
+                )}
             </div>
 
             {/* Right: Actions & Profile */}
             <div className="flex items-center gap-6">
-                {/* Search Bar (Optional/Visual only for now) */}
-                <div className="hidden md:flex items-center px-4 py-2.5 bg-surface-hover rounded-2xl border border-border focus-within:border-gold/50 transition-all w-64 shadow-inner">
-                    <Search size={18} className="text-text-muted" />
-                    <input
-                        type="text"
-                        placeholder="Search..."
-                        className="bg-transparent border-none outline-none ml-2 text-sm text-text-primary w-full placeholder:text-text-muted font-medium"
-                    />
-                </div>
+                {/* Search Bar (Removed) */}
 
                 {/* Icons */}
                 <div className="flex items-center gap-3">
@@ -136,7 +137,7 @@ export default function Header() {
                                 </div>
 
                                 <div className="p-3 space-y-1">
-                                    <Link href="/settings/profile" onClick={() => setIsDropdownOpen(false)}>
+                                    <Link href={`/profile/${user?.username}`} onClick={() => setIsDropdownOpen(false)}>
                                         <div className="flex items-center gap-4 px-4 py-3 rounded-2xl hover:bg-surface-hover text-text-primary transition-colors cursor-pointer group">
                                             <div className="p-2 rounded-xl bg-surface border border-border group-hover:border-gold/50 group-hover:text-gold transition-colors">
                                                 <User size={18} />

@@ -9,6 +9,14 @@ export class UsersService {
         return user;
     }
 
+    async getUserByUsername(username: string) {
+        const user = await UserModel.findOne({ username }).select('-password');
+        if (!user) {
+            throw new Error('User not found');
+        }
+        return user;
+    }
+
     async updateUser(userId: string, updates: Partial<IUser>) {
         const user = await UserModel.findByIdAndUpdate(
             userId,

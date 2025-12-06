@@ -9,15 +9,15 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const pathname = usePathname();
 
-    const publicPaths = ['/', '/login', '/signup'];
+    const publicPaths = ['/promotionals', '/login', '/signup'];
 
     useEffect(() => {
         if (!isInitialized) return;
 
         if (!isAuthenticated && !publicPaths.includes(pathname)) {
-            router.push('/login');
-        } else if (isAuthenticated && (pathname === '/login' || pathname === '/signup')) {
-            router.push('/dashboard');
+            router.push('/promotionals');
+        } else if (isAuthenticated && (pathname === '/login' || pathname === '/signup' || pathname === '/promotionals')) {
+            router.push('/');
         }
     }, [isAuthenticated, isInitialized, pathname, router]);
 

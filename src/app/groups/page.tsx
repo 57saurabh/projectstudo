@@ -4,7 +4,7 @@ import { Users, Plus } from 'lucide-react';
 
 export default function GroupsPage() {
     return (
-        <div className="p-6 lg:p-10 min-h-screen bg-background text-text-primary transition-colors duration-300">
+        <div className="p-6 lg:p-10 h-full bg-background text-text-primary transition-colors duration-300">
             <div className="flex items-center justify-between mb-8">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Groups</h1>
