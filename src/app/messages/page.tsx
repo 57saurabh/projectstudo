@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { MessageSquare, Search, Send, ArrowLeft, Clock, Check, CheckCheck } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { MessageSquare, Search, Send, ArrowLeft, Clock, Check, CheckCheck, Plus } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
 import axios from 'axios';
 import { useSignaling } from '@/lib/webrtc/useSignaling';
+import GroupsView from '@/components/groups/GroupsView';
 
 type ConversationUser = {
     displayName: string;
@@ -53,6 +54,7 @@ export default function MessagesPage() {
 
     const [showNewChatModal, setShowNewChatModal] = useState(false);
     const [friends, setFriends] = useState<any[]>([]);
+    const [activeTab, setActiveTab] = useState<'chats' | 'groups'>('chats');
 
     // Track online users
     useEffect(() => {
@@ -416,7 +418,8 @@ export default function MessagesPage() {
                         text: inputText,
                         timestamp: now,
                         senderId: user._id
-                    }
+                    },
+                    unreadCount: 0
                 };
 
                 return [
@@ -483,13 +486,36 @@ export default function MessagesPage() {
 
     return (
         <div className="p-4 lg:p-8 h-full bg-background text-text-primary flex flex-col transition-colors duration-300 overflow-hidden">
-            <div className="mb-4 flex justify-between items-center">
+            <div className="mb-6 flex justify-between items-center">
                 <h1 className="text-3xl font-black tracking-tighter">Messages</h1>
+
+                {/* Tab Switcher */}
+                <div className="flex bg-surface border border-border rounded-xl p-1">
+                    <button
+                        onClick={() => setActiveTab('chats')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'chats'
+                            ? 'bg-gold text-primary shadow-sm'
+                            : 'text-text-secondary hover:text-text-primary'
+                            }`}
+                    >
+                        Chats
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('groups')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'groups'
+                            ? 'bg-gold text-primary shadow-sm'
+                            : 'text-text-secondary hover:text-text-primary'
+                            }`}
+                    >
+                        Groups
+                    </button>
+                </div>
+
                 <button
                     onClick={handleStartNewChat}
-                    className="px-6 py-3 bg-gold text-primary rounded-2xl text-sm font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95"
+                    className="px-4 py-2 bg-surface-hover border border-border text-text-primary rounded-xl text-sm font-bold hover:border-gold hover:text-gold transition-all active:scale-95"
                 >
-                    New Chat
+                    <Plus size={18} />
                 </button>
             </div>
 
@@ -543,275 +569,282 @@ export default function MessagesPage() {
                     </div>
                 )}
 
-                {/* Chat List */}
-                <div
-                    className={`${activeConversation ? 'hidden md:flex' : 'flex'
-                        } w-full md:w-80 lg:w-96 flex-col border-r border-border bg-surface`}
-                >
-                    <div className="p-6 border-b border-border">
-                        <div className="relative">
-                            <Search
-                                className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted"
-                                size={18}
-                            />
-                            <input
-                                type="text"
-                                placeholder="Search chats..."
-                                className="w-full bg-surface-hover border border-border rounded-2xl py-3 pl-12 pr-4 text-sm text-text-primary focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all font-medium"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide">
-                        {isLoading ? (
-                            <div className="text-center p-4 text-text-muted">
-                                Loading...
-                            </div>
-                        ) : conversations.length === 0 ? (
-                            <div className="text-center p-4 text-text-muted">
-                                No conversations yet.
-                            </div>
-                        ) : (
-                            conversations.map((conv) => {
-                                const lastMessage = conv.lastMessage;
-                                const lastMessageTime = lastMessage?.timestamp
-                                    ? new Date(
-                                        lastMessage.timestamp
-                                    ).toLocaleTimeString([], {
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                    })
-                                    : '';
-
-                                const lastText =
-                                    lastMessage?.text?.trim() || 'No messages yet';
-
-                                const fromMe =
-                                    lastMessage?.senderId &&
-                                    user &&
-                                    lastMessage.senderId === user._id;
-
-                                if (!conv.user) return null;
-
-                                return (
-                                    <div
-                                        key={conv._id}
-                                        onClick={() => setActiveConversation(conv)}
-                                        className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-200 ${activeConversation?._id === conv._id
-                                            ? 'bg-gold/10 border border-gold/30 shadow-sm'
-                                            : 'hover:bg-surface-hover border border-transparent'
-                                            }`}
-                                    >
-                                        <div className="relative">
-                                            <img
-                                                src={
-                                                    conv.user.avatarUrl ||
-                                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv._id}`
-                                                }
-                                                alt={conv.user.displayName}
-                                                className="w-12 h-12 rounded-full bg-background object-cover border border-border"
-                                            />
-                                            {onlineUsers.has(conv._id) && (
-                                                <div className="absolute bottom-0 right-0 w-3 h-3 bg-orange rounded-full border-2 border-surface shadow-orange-glow"></div>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <h4 className={`font-bold truncate text-base ${activeConversation?._id === conv._id ? 'text-gold' : 'text-text-primary'}`}>
-                                                    {conv.user.displayName}
-                                                </h4>
-                                                {lastMessageTime && (
-                                                    <span className="text-xs text-text-muted font-medium">
-                                                        {lastMessageTime}
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex justify-between items-center">
-                                                <p
-                                                    className={`text-sm truncate ${conv.unreadCount > 0
-                                                        ? 'font-bold text-text-primary'
-                                                        : 'text-text-secondary'
-                                                        }`}
-                                                >
-                                                    {fromMe ? 'You: ' : ''}
-                                                    {lastText}
-                                                </p>
-                                                {conv.unreadCount > 0 && (
-                                                    <span className="bg-gold text-primary text-[10px] font-black px-2 py-0.5 rounded-full min-w-[20px] text-center ml-2 shadow-gold-glow">
-                                                        {conv.unreadCount}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
-
-                {/* Chat Area */}
-                {activeConversation ? (
-                    <div
-                        className={`${activeConversation ? 'flex' : 'hidden md:flex'
-                            } flex-1 flex-col bg-surface`}
-                    >
-                        {/* Header */}
-                        <div className="p-4 border-b border-border flex items-center gap-4 bg-surface/90 backdrop-blur-md z-10 shadow-sm">
-                            <button
-                                onClick={() => setActiveConversation(null)}
-                                className="md:hidden p-2 hover:bg-surface-hover rounded-full"
-                            >
-                                <ArrowLeft size={20} />
-                            </button>
-                            <img
-                                src={
-                                    activeConversation.user.avatarUrl ||
-                                    `https://api.dicebear.com/7.x/avataaars/svg?seed=${activeConversation._id}`
-                                }
-                                alt={activeConversation.user.displayName}
-                                className="w-10 h-10 rounded-full bg-background object-cover border border-border"
-                            />
-                            <div>
-                                <h3 className="font-bold text-lg leading-tight">
-                                    {activeConversation.user.displayName}
-                                </h3>
-                                <p
-                                    className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${onlineUsers.has(activeConversation._id)
-                                        ? 'text-orange'
-                                        : 'text-text-muted'
-                                        }`}
-                                >
-                                    <span
-                                        className={`w-1.5 h-1.5 rounded-full ${onlineUsers.has(
-                                            activeConversation._id
-                                        )
-                                            ? 'bg-orange animate-pulse'
-                                            : 'bg-text-secondary'
-                                            }`}
-                                    ></span>
-                                    {onlineUsers.has(activeConversation._id)
-                                        ? 'Online'
-                                        : 'Offline'}
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Messages */}
-                        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-surface">
-                            {messages.map((msg) => {
-                                const isMe = msg.senderId === user?._id;
-                                return (
-                                    <div
-                                        key={msg._id}
-                                        className={`flex ${isMe
-                                            ? 'justify-end'
-                                            : 'justify-start'
-                                            }`}
-                                    >
-                                        <div
-                                            className={`max-w-[75%] rounded-3xl px-6 py-4 shadow-md ${isMe
-                                                ? 'bg-gold text-primary rounded-tr-none shadow-gold-glow'
-                                                : 'bg-accent-cream text-black rounded-tl-none'
-                                                }`}
-                                        >
-                                            <p className="text-sm font-medium leading-relaxed">
-                                                {msg.text}
-                                            </p>
-                                            <div className="flex items-center justify-end gap-1 mt-1.5 opacity-80">
-                                                <p
-                                                    className="text-[10px] font-bold"
-                                                >
-                                                    {new Date(
-                                                        msg.timestamp
-                                                    ).toLocaleTimeString([], {
-                                                        hour: '2-digit',
-                                                        minute: '2-digit'
-                                                    })}
-                                                </p>
-                                                {isMe && (
-                                                    <div className="flex items-center">
-                                                        {msg.status === 'pending' && <Clock size={10} />}
-                                                        {msg.status === 'sent' && <Check size={10} />}
-                                                        {msg.status === 'read' && <CheckCheck size={10} />}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            <div ref={messagesEndRef} />
-                        </div>
-
-                        {/* Input or Friend Request */}
-                        {canSend ? (
-                            <form
-                                onSubmit={handleSendMessage}
-                                className="p-4 border-t border-border bg-surface"
-                            >
-                                <div className="flex gap-3">
-                                    <input
-                                        type="text"
-                                        value={inputText}
-                                        onChange={(e) =>
-                                            setInputText(e.target.value)
-                                        }
-                                        placeholder="Type a message..."
-                                        className="flex-1 bg-surface-hover border border-border rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all font-medium text-text-primary placeholder-text-muted"
-                                    />
-                                    <button
-                                        type="submit"
-                                        disabled={!inputText.trim()}
-                                        className="p-4 bg-gold text-primary rounded-2xl hover:bg-gold-hover shadow-gold-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
-                                    >
-                                        <Send size={20} />
-                                    </button>
-                                </div>
-                            </form>
-                        ) : (
-                            <div className="p-6 border-t border-border bg-surface flex flex-col items-center justify-center gap-4">
-                                <p className="text-sm text-text-muted font-medium">
-                                    You can only chat with friends.
-                                </p>
-                                {friendRequestStatus === 'pending' ? (
-                                    <button
-                                        disabled
-                                        className="px-6 py-3 bg-surface-hover border border-border text-text-muted rounded-2xl text-sm font-bold cursor-not-allowed"
-                                    >
-                                        Request Sent
-                                    </button>
-                                ) : friendRequestStatus === 'received' ? (
-                                    <button
-                                        onClick={acceptFriendRequest}
-                                        className="px-6 py-3 bg-green-500 text-white rounded-2xl text-sm font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20"
-                                    >
-                                        Accept Friend Request
-                                    </button>
-                                ) : (
-                                    <button
-                                        onClick={sendFriendRequest}
-                                        className="px-6 py-3 bg-gold text-primary rounded-2xl text-sm font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95"
-                                    >
-                                        Send Friend Request
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                {activeTab === 'groups' ? (
+                    <div className="w-full p-6">
+                        <GroupsView />
                     </div>
                 ) : (
-                    <div className="hidden md:flex flex-1 items-center justify-center flex-col text-text-secondary bg-surface/50">
-                        <div className="w-24 h-24 bg-surface-hover rounded-full flex items-center justify-center mb-6 shadow-orange-glow">
-                            <MessageSquare size={40} className="text-gold" />
+                    <>
+                        {/* Chat List */}
+                        <div
+                            className={`${activeConversation ? 'hidden md:flex' : 'flex'
+                                } w-full md:w-80 lg:w-96 flex-col border-r border-border bg-surface`}
+                        >
+                            <div className="p-6 border-b border-border">
+                                <div className="relative">
+                                    <Search
+                                        className="absolute left-4 top-1/2 -translate-y-1/2 text-text-muted"
+                                        size={18}
+                                    />
+                                    <input
+                                        type="text"
+                                        placeholder="Search chats..."
+                                        className="w-full bg-surface-hover border border-border rounded-2xl py-3 pl-12 pr-4 text-sm text-text-primary focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all font-medium"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide">
+                                {isLoading ? (
+                                    <div className="text-center p-4 text-text-muted">
+                                        Loading...
+                                    </div>
+                                ) : conversations.length === 0 ? (
+                                    <div className="text-center p-4 text-text-muted">
+                                        No conversations yet.
+                                    </div>
+                                ) : (
+                                    conversations.map((conv) => {
+                                        const lastMessage = conv.lastMessage;
+                                        const lastMessageTime = lastMessage?.timestamp
+                                            ? new Date(
+                                                lastMessage.timestamp
+                                            ).toLocaleTimeString([], {
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                            })
+                                            : '';
+
+                                        const lastText =
+                                            lastMessage?.text?.trim() || 'No messages yet';
+
+                                        const fromMe =
+                                            lastMessage?.senderId &&
+                                            user &&
+                                            lastMessage.senderId === user._id;
+
+                                        if (!conv.user) return null;
+
+                                        return (
+                                            <div
+                                                key={conv._id}
+                                                onClick={() => setActiveConversation(conv)}
+                                                className={`flex items-center gap-4 p-4 rounded-2xl cursor-pointer transition-all duration-200 ${activeConversation?._id === conv._id
+                                                    ? 'bg-gold/10 border border-gold/30 shadow-sm'
+                                                    : 'hover:bg-surface-hover border border-transparent'
+                                                    }`}
+                                            >
+                                                <div className="relative">
+                                                    <img
+                                                        src={
+                                                            conv.user.avatarUrl ||
+                                                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${conv._id}`
+                                                        }
+                                                        alt={conv.user.displayName}
+                                                        className="w-12 h-12 rounded-full bg-background object-cover border border-border"
+                                                    />
+                                                    {onlineUsers.has(conv._id) && (
+                                                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-orange rounded-full border-2 border-surface shadow-orange-glow"></div>
+                                                    )}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <h4 className={`font-bold truncate text-base ${activeConversation?._id === conv._id ? 'text-gold' : 'text-text-primary'}`}>
+                                                            {conv.user.displayName}
+                                                        </h4>
+                                                        {lastMessageTime && (
+                                                            <span className="text-xs text-text-muted font-medium">
+                                                                {lastMessageTime}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <p
+                                                            className={`text-sm truncate ${conv.unreadCount > 0
+                                                                ? 'font-bold text-text-primary'
+                                                                : 'text-text-secondary'
+                                                                }`}
+                                                        >
+                                                            {fromMe ? 'You: ' : ''}
+                                                            {lastText}
+                                                        </p>
+                                                        {conv.unreadCount > 0 && (
+                                                            <span className="bg-gold text-primary text-[10px] font-black px-2 py-0.5 rounded-full min-w-[20px] text-center ml-2 shadow-gold-glow">
+                                                                {conv.unreadCount}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
                         </div>
-                        <h3 className="text-2xl font-black text-white mb-2 tracking-tight">
-                            Your Messages
-                        </h3>
-                        <p className="text-text-muted font-medium">Select a conversation to start chatting</p>
-                    </div>
+
+                        {/* Chat Area */}
+                        {activeConversation ? (
+                            <div
+                                className={`${activeConversation ? 'flex' : 'hidden md:flex'
+                                    } flex-1 flex-col bg-surface`}
+                            >
+                                {/* Header */}
+                                <div className="p-4 border-b border-border flex items-center gap-4 bg-surface/90 backdrop-blur-md z-10 shadow-sm">
+                                    <button
+                                        onClick={() => setActiveConversation(null)}
+                                        className="md:hidden p-2 hover:bg-surface-hover rounded-full"
+                                    >
+                                        <ArrowLeft size={20} />
+                                    </button>
+                                    <img
+                                        src={
+                                            activeConversation.user.avatarUrl ||
+                                            `https://api.dicebear.com/7.x/avataaars/svg?seed=${activeConversation._id}`
+                                        }
+                                        alt={activeConversation.user.displayName}
+                                        className="w-10 h-10 rounded-full bg-background object-cover border border-border"
+                                    />
+                                    <div>
+                                        <h3 className="font-bold text-lg leading-tight">
+                                            {activeConversation.user.displayName}
+                                        </h3>
+                                        <p
+                                            className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${onlineUsers.has(activeConversation._id)
+                                                ? 'text-orange'
+                                                : 'text-text-muted'
+                                                }`}
+                                        >
+                                            <span
+                                                className={`w-1.5 h-1.5 rounded-full ${onlineUsers.has(
+                                                    activeConversation._id
+                                                )
+                                                    ? 'bg-orange animate-pulse'
+                                                    : 'bg-text-secondary'
+                                                    }`}
+                                            ></span>
+                                            {onlineUsers.has(activeConversation._id)
+                                                ? 'Online'
+                                                : 'Offline'}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Messages */}
+                                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-surface">
+                                    {messages.map((msg) => {
+                                        const isMe = msg.senderId === user?._id;
+                                        return (
+                                            <div
+                                                key={msg._id}
+                                                className={`flex ${isMe
+                                                    ? 'justify-end'
+                                                    : 'justify-start'
+                                                    }`}
+                                            >
+                                                <div
+                                                    className={`max-w-[75%] rounded-3xl px-6 py-4 shadow-md ${isMe
+                                                        ? 'bg-gold text-primary rounded-tr-none shadow-gold-glow'
+                                                        : 'bg-accent-cream text-black rounded-tl-none'
+                                                        }`}
+                                                >
+                                                    <p className="text-sm font-medium leading-relaxed">
+                                                        {msg.text}
+                                                    </p>
+                                                    <div className="flex items-center justify-end gap-1 mt-1.5 opacity-80">
+                                                        <p
+                                                            className="text-[10px] font-bold"
+                                                        >
+                                                            {new Date(
+                                                                msg.timestamp
+                                                            ).toLocaleTimeString([], {
+                                                                hour: '2-digit',
+                                                                minute: '2-digit'
+                                                            })}
+                                                        </p>
+                                                        {isMe && (
+                                                            <div className="flex items-center">
+                                                                {msg.status === 'pending' && <Clock size={10} />}
+                                                                {msg.status === 'sent' && <Check size={10} />}
+                                                                {msg.status === 'read' && <CheckCheck size={10} />}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                    <div ref={messagesEndRef} />
+                                </div>
+
+                                {/* Input or Friend Request */}
+                                {canSend ? (
+                                    <form
+                                        onSubmit={handleSendMessage}
+                                        className="p-4 border-t border-border bg-surface"
+                                    >
+                                        <div className="flex gap-3">
+                                            <input
+                                                type="text"
+                                                value={inputText}
+                                                onChange={(e) =>
+                                                    setInputText(e.target.value)
+                                                }
+                                                placeholder="Type a message..."
+                                                className="flex-1 bg-surface-hover border border-border rounded-2xl px-5 py-4 text-sm focus:outline-none focus:border-gold focus:ring-1 focus:ring-gold transition-all font-medium text-text-primary placeholder-text-muted"
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={!inputText.trim()}
+                                                className="p-4 bg-gold text-primary rounded-2xl hover:bg-gold-hover shadow-gold-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
+                                            >
+                                                <Send size={20} />
+                                            </button>
+                                        </div>
+                                    </form>
+                                ) : (
+                                    <div className="p-6 border-t border-border bg-surface flex flex-col items-center justify-center gap-4">
+                                        <p className="text-sm text-text-muted font-medium">
+                                            You can only chat with friends.
+                                        </p>
+                                        {friendRequestStatus === 'pending' ? (
+                                            <button
+                                                disabled
+                                                className="px-6 py-3 bg-surface-hover border border-border text-text-muted rounded-2xl text-sm font-bold cursor-not-allowed"
+                                            >
+                                                Request Sent
+                                            </button>
+                                        ) : friendRequestStatus === 'received' ? (
+                                            <button
+                                                onClick={acceptFriendRequest}
+                                                className="px-6 py-3 bg-green-500 text-white rounded-2xl text-sm font-bold hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20"
+                                            >
+                                                Accept Friend Request
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={sendFriendRequest}
+                                                className="px-6 py-3 bg-gold text-primary rounded-2xl text-sm font-bold hover:bg-gold-hover shadow-gold-glow transition-all active:scale-95"
+                                            >
+                                                Send Friend Request
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            <div className="hidden md:flex flex-1 items-center justify-center flex-col text-text-secondary bg-surface/50">
+                                <div className="w-24 h-24 bg-surface-hover rounded-full flex items-center justify-center mb-6 shadow-orange-glow">
+                                    <MessageSquare size={40} className="text-gold" />
+                                </div>
+                                <h3 className="text-2xl font-black text-white mb-2 tracking-tight">
+                                    Your Messages
+                                </h3>
+                                <p className="text-text-muted font-medium">Select a conversation to start chatting</p>
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>
     );
 }
-

@@ -67,6 +67,15 @@ export default function DashboardPage() {
                 <div className="flex-1 w-full overflow-hidden">
                     <h3 className="font-bold text-text-secondary mb-4">Loops</h3>
                     <Loops />
+
+                    {/* Greeting Section */}
+                    <div className="mt-8 mb-2">
+                        <h1 className="text-3xl font-black tracking-tight text-primary flex flex-col leading-tight">
+                            <span>Hey,</span>
+                            <span className="text-gold">{user?.username || 'Stranger'}</span>
+                        </h1>
+                        <p className="text-sm text-text-secondary font-medium mt-2">Ready to cause some chaos?</p>
+                    </div>
                 </div>
 
                 {/* Go Live Card (Moved here) */}
@@ -74,7 +83,7 @@ export default function DashboardPage() {
                     variants={itemVariants}
                     initial="hidden"
                     animate="visible"
-                    className="w-full lg:w-auto min-w-[280px]"
+                    className="w-full lg:w-auto min-w-[280px] hidden lg:block"
                 >
                     <Link href="/live" className="block h-full">
                         <div className="h-full p-6 rounded-[2rem] bg-gradient-to-r from-orange/10 to-surface border border-orange/30 hover:border-orange transition-all duration-300 flex items-center justify-between group shadow-sm hover:shadow-orange-glow">
@@ -98,26 +107,29 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 {/* Main Grid - CTA Tiles */}
                 <motion.div
-                    className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4"
+                    className="lg:col-span-2 grid grid-cols-2 md:grid-cols-2 gap-4"
                     variants={containerVariants}
                     initial="hidden"
                     animate="visible"
                 >
                     {/* Random Chat */}
-                    <motion.div variants={itemVariants} className="col-span-1 md:col-span-2 aspect-[2/1] md:aspect-[3/1]">
+                    <motion.div variants={itemVariants} className="col-span-1 md:col-span-2 aspect-square md:aspect-[3/1]">
                         <Link href="/call/pre-check" className="block h-full">
-                            <div className="h-full p-8 rounded-[2rem] bg-gradient-to-r from-gold/20 via-surface to-surface border border-gold/30 hover:border-gold hover:shadow-gold-glow transition-all duration-300 group relative overflow-hidden">
+                            <div className="h-full p-4 md:p-8 rounded-[2rem] bg-gradient-to-r from-gold/20 via-surface to-surface border border-gold/30 hover:border-gold hover:shadow-gold-glow transition-all duration-300 group relative overflow-hidden flex flex-col justify-between md:block">
                                 <div className="relative z-10 flex flex-col justify-center h-full">
-                                    <div className="w-12 h-12 rounded-full bg-gold flex items-center justify-center mb-4 text-primary font-bold">
-                                        <Zap size={24} />
+                                    <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gold flex items-center justify-center mb-2 md:mb-4 text-primary font-bold">
+                                        <Zap size={20} className="md:w-6 md:h-6" />
                                     </div>
-                                    <h2 className="text-4xl font-black italic text-primary mb-2">RANDOM CHAT</h2>
-                                    <p className="text-accent-cream opacity-80 max-w-sm">
+                                    <h2 className="text-xl md:text-4xl font-black italic text-primary mb-1 md:mb-2 leading-tight">RANDOM <br className="md:hidden" /> CHAT</h2>
+                                    <p className="text-accent-cream opacity-80 max-w-sm text-xs md:text-base hidden md:block">
                                         Throw caution to the wind. Meet the unexpected.
+                                    </p>
+                                    <p className="text-accent-cream opacity-80 text-xs md:hidden">
+                                        Meet the unexpected.
                                     </p>
                                 </div>
                                 <div className="absolute right-0 bottom-0 opacity-10 group-hover:opacity-20 transition-opacity transform translate-x-1/4 translate-y-1/4">
-                                    <Zap size={300} />
+                                    <Zap size={120} className="md:w-[300px] md:h-[300px]" />
                                 </div>
                             </div>
                         </Link>
@@ -158,6 +170,24 @@ export default function DashboardPage() {
                             </div>
                         </Link>
                     </motion.div>
+
+                    {/* Go Live (Mobile Only) */}
+                    <motion.div variants={itemVariants} className="lg:hidden aspect-square">
+                        <Link href="/live" className="block h-full">
+                            <div className="h-full p-4 rounded-[2rem] bg-gradient-to-br from-orange/10 to-surface border border-orange/30 hover:border-orange transition-all duration-300 flex flex-col justify-between group shadow-sm hover:shadow-orange-glow">
+                                <div className="w-10 h-10 rounded-full bg-orange flex items-center justify-center text-white shadow-lg shadow-orange/30">
+                                    <Radio size={20} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-bold text-primary leading-tight">Go Live</h3>
+                                    <p className="text-xs text-text-muted">Broadcast now.</p>
+                                </div>
+                                <div className="absolute top-4 right-4 px-2 py-0.5 bg-danger/20 text-danger text-[10px] font-bold rounded-full animate-pulse">
+                                    LIVE
+                                </div>
+                            </div>
+                        </Link>
+                    </motion.div>
                 </motion.div>
 
                 {/* Right Sidebar */}
@@ -179,7 +209,7 @@ export default function DashboardPage() {
                                         />
                                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-gold rounded-full border-2 border-surface" />
                                     </div>
-                                    <span className="text-xs font-medium text-text-primary text-center truncate w-full">{(u.displayName || u.username || 'User').split(' ')[0]}</span>
+                                    <span className="hidden lg:block text-xs font-medium text-text-primary text-center truncate w-full">{(u.displayName || u.username || 'User').split(' ')[0]}</span>
                                     <button className="p-1 rounded-full bg-surface border border-border hover:bg-gold hover:text-background hover:border-gold transition-colors text-text-muted">
                                         <UserPlus size={12} />
                                     </button>

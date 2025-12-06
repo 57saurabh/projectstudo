@@ -83,8 +83,8 @@ export interface IUser {
     isVerified?: boolean;
     category?: string;
 
-    followers?: number;
-    following?: number;
+    followers?: any[];
+    following?: any[];
 
     friends?: any[]; // Array of User IDs
 
@@ -203,8 +203,8 @@ const UserSchema = new Schema<UserDocument>(
         isVerified: { type: Boolean, default: false },
         category: String,
 
-        followers: { type: Number, default: 0 },
-        following: { type: Number, default: 0 },
+        followers: [{ type: Schema.Types.ObjectId, ref: "User" }],
+        following: [{ type: Schema.Types.ObjectId, ref: "User" }],
 
         friends: [{ type: Schema.Types.ObjectId, ref: "User" }],
 
