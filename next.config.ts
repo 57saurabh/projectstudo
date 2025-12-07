@@ -6,16 +6,20 @@ const nextConfig: NextConfig = {
     domains: ['api.dicebear.com', 'lh3.googleusercontent.com'],
   },
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:4000/api/:path*', // Proxy to Backend
-      },
-      {
-        source: '/friend-request/:path*', // Proxy legacy friend-request routes if any
-        destination: 'http://localhost:4000/friend-request/:path*',
-      }
-    ];
+    return {
+      beforeFiles: [],
+      afterFiles: [],
+      fallback: [
+        {
+          source: '/api/:path*',
+          destination: 'http://localhost:4000/api/:path*',
+        },
+        {
+          source: '/friend-request/:path*',
+          destination: 'http://localhost:4000/friend-request/:path*',
+        }
+      ]
+    };
   },
 };
 

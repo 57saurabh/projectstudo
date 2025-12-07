@@ -20,6 +20,7 @@ import MatchOverlay from '@/components/call/random/MatchOverlay';
 import VideoGrid from '@/components/call/random/VideoGrid';
 import Controls from '@/components/call/random/Controls';
 import ChatArea from '@/components/call/random/ChatArea';
+import RecommendationsView from '@/components/call/random/RecommendationsView';
 
 export default function RandomChatPage() {
     const { user, token } = useSelector((state: RootState) => state.auth);
@@ -33,6 +34,8 @@ export default function RandomChatPage() {
     const [countdown, setCountdown] = useState(30);
     const [showInviteModal, setShowInviteModal] = useState(false);
     const [hasAccepted, setHasAccepted] = useState(false);
+    const [recommendations, setRecommendations] = useState<any[]>([]);
+    const [recommendationsType, setRecommendationsType] = useState<'incoming' | 'outgoing'>('incoming');
 
     // Moderation State
     const [faceWarning, setFaceWarning] = useState<string | null>(null);
@@ -167,11 +170,42 @@ export default function RandomChatPage() {
                 abortCall();
                 findMatch();
             });
+
+            socket.on('recommendation-received', (data: { type: 'incoming' | 'outgoing', user?: any, users?: any[], roomId?: string }) => {
+                console.log('Recommendation received:', data);
+                setRecommendationsType(data.type);
+
+                // Store roomId for voting
+                if (data.roomId) {
+                    (socket as any).currentRoomId = data.roomId;
+                } else {
+                    // If incoming, we are already in a room. We can usually get it from local state but let's assume valid context
+                    // The backend emits to room, so we are in it.
+                }
+
+                if (data.type === 'incoming' && data.user) {
+                    setRecommendations(prev => [...prev, data.user]);
+                    toast.info(`Recommended: ${data.user.displayName}`);
+                } else if (data.type === 'outgoing' && data.users) {
+                    setRecommendations(data.users);
+                    toast.info(`You have been recommended to ${data.users.length} users.`);
+                }
+            });
+
+            socket.on('recommendation-ended', (data: { reason: string, by?: string }) => {
+                setRecommendations([]);
+                if (data.reason === 'skipped') {
+                    toast.error('Refused.');
+                } else if (data.reason === 'accepted') {
+                    toast.success('Joined!');
+                }
+            });
         }
 
         return () => {
             socket?.off('user-count');
             socket?.off('call-ended');
+            socket?.off('recommendation-received');
             // Abort call and reset state on unmount (route change)
             abortCall();
         };
@@ -322,6 +356,52 @@ export default function RandomChatPage() {
                         onInvite={() => setShowInviteModal(true)}
                         onAddRandomUser={handleAddRandomUser}
                     />
+
+                    {recommendations.length > 0 && (
+                        <RecommendationsView
+                            recommendations={recommendations}
+                            onConnect={(peerId) => {
+                                if (callState === 'connected' && (socket as any).currentRoomId) {
+                                    // In a call -> Vote Accept
+                                    socket?.emit('recommendation-action', {
+                                        action: 'accept',
+                                        recommendedPeerId: recommendationsType === 'outgoing' ? socket.id : peerId,
+                                        roomId: (socket as any).currentRoomId
+                                    });
+                                } else {
+                                    // Idle -> Initiate Connection
+                                    // Use 'connect-recommendation' which maps to initiate logic in backend
+                                    socket?.emit('connect-recommendation', { peerId });
+                                    toast.info('Request sent...');
+                                }
+
+                                // Clean up local list if it was outgoing (my suggestions)
+                                // If incoming, wait for result?
+                                if (recommendationsType === 'outgoing') {
+                                    // Keep showing? Or hide?
+                                    // User might want to click multiple?
+                                    // Strict rules say 1v1 or consensus. 
+                                    // If we click one, we probably enter "Waiting" state.
+                                    setRecommendations([]);
+                                }
+                            }}
+                            onClose={() => {
+                                // Send SKIP vote
+                                // We need the recommendedPeerId. 
+                                // Incoming: All items in list are recommended (usually 1).
+                                // Outgoing: We are the recommended one.
+                                // If we close, we skip.
+                                const targetId = recommendations[0]?.peerId; // Assuming single recommendation for now for incoming
+                                socket?.emit('recommendation-action', {
+                                    action: 'skip',
+                                    recommendedPeerId: recommendationsType === 'outgoing' ? socket.id : targetId,
+                                    roomId: (socket as any).currentRoomId // We need to store roomId somewhere accessible
+                                });
+                                setRecommendations([]);
+                            }}
+                            title={recommendationsType === 'incoming' ? "New User Found" : "Found a Group"}
+                        />
+                    )}
                 </div>
 
                 <ChatArea

@@ -50,26 +50,48 @@ export async function PUT(req: Request, props: { params: Promise<{ requestId: st
 
         if (!request) {
             console.log('Request not found or invalid');
-            return NextResponse.json({ message: 'Request not found or already processed' }, { status: 404 });
+            return NextResponse.json({
+                message: 'Request not found in DB (DEBUG MODE)',
+                debug: { requestId, currentUserId }
+            }, { status: 409 });
         }
 
         if (action === 'accept') {
             request.status = 'accepted';
             await request.save();
 
-            // Add to friends lists
+            // Add to friends lists (Manual fetch and save to handle legacy schema migration)
             const senderId = request.sender;
             const receiverId = request.receiver;
 
-            // Update Receiver (Current User)
-            await User.findByIdAndUpdate(receiverId, {
-                $addToSet: { friends: senderId, followers: senderId, following: senderId }
-            });
+            const receiver = await User.findById(receiverId);
+            const sender = await User.findById(senderId);
 
-            // Update Sender
-            await User.findByIdAndUpdate(senderId, {
-                $addToSet: { friends: receiverId, followers: receiverId, following: receiverId }
-            });
+            if (receiver) {
+                if (!Array.isArray(receiver.friends)) receiver.friends = [];
+                if (!Array.isArray(receiver.followers)) receiver.followers = [];
+                if (!Array.isArray(receiver.following)) receiver.following = [];
+
+                if (!receiver.friends.includes(senderId)) receiver.friends.push(senderId);
+                // Bi-directional following on friend accept?
+                // Typically friends follow each other.
+                if (!receiver.followers.includes(senderId)) receiver.followers.push(senderId);
+                if (!receiver.following.includes(senderId)) receiver.following.push(senderId);
+
+                await receiver.save();
+            }
+
+            if (sender) {
+                if (!Array.isArray(sender.friends)) sender.friends = [];
+                if (!Array.isArray(sender.followers)) sender.followers = [];
+                if (!Array.isArray(sender.following)) sender.following = [];
+
+                if (!sender.friends.includes(receiverId)) sender.friends.push(receiverId);
+                if (!sender.followers.includes(receiverId)) sender.followers.push(receiverId);
+                if (!sender.following.includes(receiverId)) sender.following.push(receiverId);
+
+                await sender.save();
+            }
 
             return NextResponse.json({ message: 'Friend request accepted', status: 'accepted' });
         }

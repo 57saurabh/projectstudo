@@ -1,333 +1,553 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
-import { useCallStore } from '../store/useCallStore';
-import { useSignaling } from './useSignaling';
+// useWebRTC.ts
+'use client';
 
-const ICE_SERVERS = {
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSignalingContext } from './SignalingContext'; // adjust path if needed
+import { useCallStore } from '../store/useCallStore';
+import { toast } from 'sonner';
+
+type PCMap = Record<string, RTCPeerConnection>;
+type StreamMap = Record<string, MediaStream>;
+
+const ICE_CONFIG: RTCConfiguration = {
     iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:global.stun.twilio.com:3478' }
+        { urls: ['stun:stun.l.google.com:19302'] },
+        // add TURN servers here for production
     ]
 };
 
-export const useWebRTC = () => {
-    const {
-        socket,
-        findMatch,
-        sendMessage,
-        skipMatch,
-        addRandomUser,
-        acceptMatch: signalAcceptMatch,
-        inviteUser,
-        acceptInvite,
-        rejectInvite
-    } = useSignaling();
+const MAX_PARTICIPANTS = 9;
 
+export function useWebRTC() {
+    const { socket } = useSignalingContext(); // get socket from your SignalingContext
     const {
-        localStream,
-        setLocalStream,
-        setMediaError,
-        addRemoteStream,
-        removeRemoteStream,
-        callState,
-        isInitiator,
-        participants,
+        addParticipant,
+        removeParticipant,
         updateParticipant,
         setCallState,
-        resetCall
+        setInCall,
+        setInQueue,
+        resetCall,
+        addMessage,
+        setPendingInvite,
+        setIsInitiator
     } = useCallStore();
 
-    const peerConnections = useRef<Record<string, RTCPeerConnection>>({});
-    const [roomId, setRoomId] = useState<string | null>(null);
+    // Local media
+    const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const [isMicOn, setMicOn] = useState(true);
+    const [isCamOn, setCamOn] = useState(true);
+    const [isScreenSharing, setScreenSharing] = useState(false);
 
-    const streamRef = useRef<MediaStream | null>(null);
+    // PeerConnections and tracks
+    const pcs = useRef<PCMap>({});
+    const remoteStreams = useRef<StreamMap>({});
+    const pendingCandidates = useRef<Record<string, RTCIceCandidateInit[]>>({});
 
-    // Initialize Local Stream
-    useEffect(() => {
-        const initStream = async () => {
-            if (localStream && localStream.active && localStream.getTracks().some(t => t.readyState === 'live')) {
-                streamRef.current = localStream;
-                return;
-            }
+    // Negotiation guards
+    const creatingOffer = useRef<Record<string, boolean>>({});
+    const hasLocalDescription = useRef<Record<string, boolean>>({});
 
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: true
-                });
-                setLocalStream(stream);
-                streamRef.current = stream;
-                setMediaError(null);
-            } catch (err: any) {
-                console.error('Error accessing media devices:', err);
-                if (err.name === 'NotAllowedError') {
-                    setMediaError('Permission denied. Please allow camera and microphone access.');
-                } else if (err.name === 'NotFoundError') {
-                    setMediaError('No camera or microphone found.');
-                } else {
-                    setMediaError('Failed to access camera/microphone. Ensure you are using HTTPS or localhost.');
-                }
-            }
-        };
-
-        initStream();
-
-        return () => {
-            // Cleanup logic handled by CameraGuard or manual reset
-        };
-    }, []);
-
-    const createPeerConnection = useCallback((peerId: string) => {
-        if (peerConnections.current[peerId]) return peerConnections.current[peerId];
-
-        console.log(`Creating PeerConnection for ${peerId}`);
-        const pc = new RTCPeerConnection(ICE_SERVERS);
-        peerConnections.current[peerId] = pc;
-
-        // Add local tracks
-        if (localStream) {
-            localStream.getTracks().forEach(track => {
-                pc.addTrack(track, localStream);
-            });
+    // helpers
+    const ensureLocalStream = useCallback(async () => {
+        if (localStream) return localStream;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+            setLocalStream(stream);
+            return stream;
+        } catch (err) {
+            console.error('Failed to get local media', err);
+            toast.error('Failed to access camera/microphone');
+            throw err;
         }
+    }, [localStream]);
 
-        // Handle ICE candidates
+    // Create or return existing peer connection for a peerId
+    const createPeerConnection = useCallback((peerId: string) => {
+        if (pcs.current[peerId]) return pcs.current[peerId];
+
+        const pc = new RTCPeerConnection(ICE_CONFIG);
+
+        // track remote streams
+        pc.ontrack = (ev) => {
+            // prefer first incoming stream
+            const stream = ev.streams && ev.streams[0];
+            if (stream) {
+                remoteStreams.current[peerId] = stream;
+                addParticipant({
+                    id: peerId,
+                    userId: undefined,
+                    displayName: `User-${peerId.slice(0, 6)}`,
+                    isMuted: false,
+                    isVideoOff: false,
+                    reputation: 100,
+                    avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${peerId}`,
+                    shouldOffer: false
+                });
+            }
+        };
+
         pc.onicecandidate = (event) => {
             if (event.candidate && socket) {
+                // Only send candidate if peer is in same room — server is expected to filter, but do best-effort check
                 socket.emit('ice-candidate', { target: peerId, candidate: event.candidate });
             }
         };
 
-        // Handle Remote Stream
-        pc.ontrack = (event) => {
-            console.log('Received remote track from:', peerId, event.streams[0]);
-            const [remoteStream] = event.streams;
-            if (remoteStream) {
-                addRemoteStream(peerId, remoteStream);
-            }
-        };
-
         pc.onconnectionstatechange = () => {
-            console.log(`Connection state with ${peerId}:`, pc.connectionState);
-            if (pc.connectionState === 'connected') {
-                // Only set to connected if we aren't already (to avoid flickering)
-                if (useCallStore.getState().callState !== 'connected') {
-                    setCallState('connected');
-                }
-            } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
-                console.log(`Peer ${peerId} disconnected`);
-                removeRemoteStream(peerId);
-                pc.close();
-                delete peerConnections.current[peerId];
-
-                // If no peers left, maybe reset? Or wait?
-                // For mesh, we stay alive as long as 1 peer is there.
-                if (Object.keys(peerConnections.current).length === 0) {
-                    // resetCall(true); // Don't reset fully, maybe just go back to idle?
-                    // Actually, if everyone leaves, we are alone.
-                }
+            const s = pc.connectionState;
+            console.log(`PC ${peerId} connectionState:`, s);
+            if (s === 'failed' || s === 'disconnected' || s === 'closed') {
+                // cleanup
+                removePeer(peerId);
             }
         };
+
+        pcs.current[peerId] = pc;
+        pendingCandidates.current[peerId] = [];
+        creatingOffer.current[peerId] = false;
+        hasLocalDescription.current[peerId] = false;
 
         return pc;
-    }, [localStream, socket, addRemoteStream, removeRemoteStream, setCallState]);
+    }, [socket, addParticipant]);
 
-    // Handle Signaling Events for WebRTC
+    // Cleanup a peer
+    const removePeer = useCallback((peerId: string) => {
+        try {
+            const pc = pcs.current[peerId];
+            if (pc) {
+                pc.close();
+                delete pcs.current[peerId];
+            }
+            delete pendingCandidates.current[peerId];
+            delete remoteStreams.current[peerId];
+            delete creatingOffer.current[peerId];
+            delete hasLocalDescription.current[peerId];
+
+            removeParticipant(peerId);
+        } catch (e) {
+            console.warn('Error while removing peer', peerId, e);
+        }
+    }, [removeParticipant]);
+
+    // Flush buffered ICE candidates after remote description is set
+    const flushPendingCandidates = useCallback(async (peerId: string) => {
+        const pc = pcs.current[peerId];
+        if (!pc) return;
+        const list = pendingCandidates.current[peerId] || [];
+        if (list.length === 0) return;
+        try {
+            for (const c of list) {
+                await pc.addIceCandidate(c);
+            }
+        } catch (err) {
+            console.error('Failed to add buffered ICE candidates', err);
+        } finally {
+            pendingCandidates.current[peerId] = [];
+        }
+    }, []);
+
+    // Initiator creates offer (only call when shouldOffer = true)
+    const createAndSendOffer = useCallback(async (peerId: string) => {
+        if (!socket) return;
+        if (creatingOffer.current[peerId]) return; // avoid duplicate offers
+        creatingOffer.current[peerId] = true;
+
+        try {
+            const pc = createPeerConnection(peerId);
+            const stream = await ensureLocalStream();
+
+            // add local tracks if not added
+            const senders = pc.getSenders().map(s => s.track).filter(Boolean);
+            if (stream && senders.length === 0) {
+                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            }
+
+            const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+            await pc.setLocalDescription(offer);
+            hasLocalDescription.current[peerId] = true;
+
+            socket.emit('offer', { target: peerId, sdp: pc.localDescription });
+        } catch (err) {
+            console.error('Failed to create/send offer', err);
+        } finally {
+            creatingOffer.current[peerId] = false;
+        }
+    }, [socket, createPeerConnection, ensureLocalStream]);
+
+    // Handle incoming offer
+    const handleOffer = useCallback(async (sender: string, sdp: RTCSessionDescriptionInit) => {
+        try {
+            const pc = createPeerConnection(sender);
+            const stream = await ensureLocalStream();
+
+            // add local tracks if not already
+            const senders = pc.getSenders().map(s => s.track).filter(Boolean);
+            if (stream && senders.length === 0) {
+                stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            }
+
+            // Apply remote offer
+            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+
+            // create answer
+            const answer = await pc.createAnswer();
+            await pc.setLocalDescription(answer);
+            hasLocalDescription.current[sender] = true;
+
+            // send answer
+            socket?.emit('answer', { target: sender, sdp: pc.localDescription });
+
+            // flush any buffered ICE for this peer
+            await flushPendingCandidates(sender);
+        } catch (err) {
+            console.error('Error handling offer from', sender, err);
+        }
+    }, [createPeerConnection, ensureLocalStream, socket, flushPendingCandidates]);
+
+    // Handle incoming answer
+    const handleAnswer = useCallback(async (sender: string, sdp: RTCSessionDescriptionInit) => {
+        try {
+            const pc = pcs.current[sender];
+            if (!pc) {
+                console.warn('Received answer for unknown pc', sender);
+                return;
+            }
+
+            // Only set remote answer if we have local offer
+            const allowed = pc.signalingState === 'have-local-offer' || pc.signalingState === 'have-local-pranswer';
+            if (!allowed) {
+                console.warn('Received answer in wrong state', pc.signalingState, 'for', sender);
+                return;
+            }
+
+            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+
+            // flush buffered
+            await flushPendingCandidates(sender);
+        } catch (err) {
+            console.error('Error handling answer from', sender, err);
+        }
+    }, [flushPendingCandidates]);
+
+    // Handle incoming ICE candidate (remote)
+    const handleRemoteIce = useCallback(async (sender: string, candidate: RTCIceCandidateInit) => {
+        const pc = pcs.current[sender];
+        if (!pc) {
+            // buffer until pc created
+            pendingCandidates.current[sender] = pendingCandidates.current[sender] || [];
+            pendingCandidates.current[sender].push(candidate);
+            return;
+        }
+
+        try {
+            // if remoteDescription not set yet, buffer
+            if (!pc.remoteDescription || pc.remoteDescription.type === '') {
+                pendingCandidates.current[sender] = pendingCandidates.current[sender] || [];
+                pendingCandidates.current[sender].push(candidate);
+            } else {
+                await pc.addIceCandidate(candidate);
+            }
+        } catch (err) {
+            console.error('Error adding remote ICE candidate', err);
+        }
+    }, []);
+
+    // Toggle mic / cam / screen share
+    const toggleMic = useCallback(() => {
+        if (!localStream) return;
+        localStream.getAudioTracks().forEach(t => (t.enabled = !t.enabled));
+        setMicOn(prev => !prev);
+    }, [localStream]);
+
+    const toggleCam = useCallback(() => {
+        if (!localStream) return;
+        localStream.getVideoTracks().forEach(t => (t.enabled = !t.enabled));
+        setCamOn(prev => !prev);
+    }, [localStream]);
+
+    const toggleScreenShare = useCallback(async () => {
+        if (isScreenSharing) {
+            // stop screen and re-add camera
+            if (!localStream) {
+                setScreenSharing(false);
+                return;
+            }
+            // re-acquire camera track and replace on senders
+            const cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            const cameraTrack = cameraStream.getVideoTracks()[0];
+            // replace for each pc
+            Object.values(pcs.current).forEach(pc => {
+                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+                if (sender) sender.replaceTrack(cameraTrack);
+            });
+            setScreenSharing(false);
+            // replace in localStream
+            localStream.getVideoTracks().forEach(t => t.stop());
+            localStream.addTrack(cameraTrack);
+            setLocalStream(localStream);
+            return;
+        }
+
+        try {
+            const screenStream = await (navigator.mediaDevices as any).getDisplayMedia({ video: true });
+            const screenTrack = screenStream.getVideoTracks()[0];
+
+            // replace on each pc
+            Object.values(pcs.current).forEach(pc => {
+                const sender = pc.getSenders().find(s => s.track?.kind === 'video');
+                if (sender) sender.replaceTrack(screenTrack);
+            });
+
+            // update local stream (stop previous video)
+            localStream?.getVideoTracks().forEach(t => t.stop());
+            const newLocal = localStream || new MediaStream();
+            newLocal.addTrack(screenTrack);
+            setLocalStream(newLocal);
+            setScreenSharing(true);
+
+            // when screen sharing stops, revert
+            screenTrack.onended = () => {
+                setScreenSharing(false);
+                toggleScreenShare(); // attempt to revert
+            };
+        } catch (err) {
+            console.warn('Screen share failed', err);
+        }
+    }, [isScreenSharing, localStream]);
+
+    // Public API methods that emit to socket
+    const findMatch = useCallback(() => {
+        setInQueue(true);
+        setCallState('searching');
+        socket?.emit('find-match');
+    }, [socket, setInQueue, setCallState]);
+
+    const sendMessage = useCallback((targetId: string, text: string) => {
+        if (!socket) return;
+        socket.emit('chat-message', { target: targetId, message: text });
+        addMessage({ senderId: 'me', senderName: 'Me', text, timestamp: Date.now() });
+    }, [socket, addMessage]);
+
+    const skipMatch = useCallback((targetId?: string) => {
+        if (!socket) return;
+        if (targetId) socket.emit('skip-match', { target: targetId });
+        resetCall();
+        findMatch();
+    }, [socket, resetCall, findMatch]);
+
+    const addRandomUser = useCallback(() => {
+        if (!socket) return;
+        socket.emit('add-user');
+        toast.info('Searching for another user to add...');
+    }, [socket]);
+
+    const inviteUser = useCallback((targetId: string) => {
+        if (!socket) return;
+        socket.emit('invite-user', { target: targetId });
+    }, [socket]);
+
+    const acceptInvite = useCallback((senderId: string) => {
+        if (!socket) return;
+        socket.emit('accept-invite', { senderId });
+        setPendingInvite(null);
+    }, [socket, setPendingInvite]);
+
+    const rejectInvite = useCallback(() => {
+        setPendingInvite(null);
+    }, [setPendingInvite]);
+
+    const acceptMatch = useCallback((targetId: string) => {
+        if (!socket) return;
+        socket.emit('accept-match', { target: targetId });
+    }, [socket]);
+
+    // Abort and cleanup the entire call (leave room)
+    const abortCall = useCallback(() => {
+        // Close all PCs and clear
+        Object.keys(pcs.current).forEach(pid => {
+            try {
+                pcs.current[pid]?.close();
+            } catch (e) { }
+            delete pcs.current[pid];
+        });
+        pendingCandidates.current = {};
+        remoteStreams.current = {};
+        setInCall(false);
+        setCallState('idle');
+        resetCall();
+        // Inform server to leave room / abort
+        socket?.emit('abort-call');
+    }, [socket, resetCall, setInCall, setCallState]);
+
+    // Wire up socket event listeners
     useEffect(() => {
         if (!socket) return;
 
-        // MATCH FOUND (Initial 1-on-1 or +1 joining)
-        socket.on('match-found', async (data) => {
-            console.log('Match found:', data);
-            const { roomId: newRoomId, peerId, initiator, isPlusOne } = data;
-            setRoomId(newRoomId);
-
-            // Add participant to store (metadata)
-            useCallStore.getState().addParticipant({
-                id: peerId,
-                name: data.username,
-                isMuted: false,
-                isVideoOff: false,
-                avatarUrl: data.avatarUrl
-            });
-
-            // Store initiator status but DO NOT offer yet. Wait for acceptMatch.
-            if (initiator) {
-                useCallStore.getState().setIsInitiator(true);
-            } else {
-                useCallStore.getState().setIsInitiator(false);
-            }
-
-            if (!isPlusOne) {
-                setCallState('proposed'); // Wait for user acceptance
-            } else {
-                // For +1 (joining existing room), maybe auto-connect or also propose?
-                // Usually +1 is invited or added, so maybe auto-connect is fine for the joiner?
-                // But the user said "why it is doing auto connect", implying they want control.
-                // Let's make it consistent: always proposed for the main match.
-                // But wait, if I am the one adding +1, I am already connected.
-                // The new guy needs to accept.
-                // If I am the new guy (isPlusOne=true), I should see proposed.
-                setCallState('proposed');
-            }
+        // Offer
+        socket.on('offer', async (payload: { sender: string, sdp: RTCSessionDescriptionInit }) => {
+            const { sender, sdp } = payload;
+            console.log('socket.on(offer) from', sender);
+            await handleOffer(sender, sdp);
         });
 
-        // USER JOINED (Existing room, new guy enters)
-        socket.on('user-joined', async (data) => {
-            const { peerId } = data;
-            console.log(`User joined room: ${peerId}`);
+        // Answer
+        socket.on('answer', async (payload: { sender: string, sdp: RTCSessionDescriptionInit }) => {
+            const { sender, sdp } = payload;
+            console.log('socket.on(answer) from', sender);
+            await handleAnswer(sender, sdp);
+        });
 
-            // Existing participants initiate to the new guy (Mesh convention for this app)
+        // Remote ICE
+        socket.on('ice-candidate', async (payload: { sender: string, candidate: RTCIceCandidateInit }) => {
+            const { sender, candidate } = payload;
+            await handleRemoteIce(sender, candidate);
+        });
+
+        // user-joined: server tells us a peer exists in the room now => create PC and (if shouldOffer) start offer
+        socket.on('user-joined', async (data: any) => {
+            const peerId = data.peerId || data.id || data.peerId;
+            console.log('socket.on(user-joined)', peerId, data);
+
+            // Create pc but don't start negotiation until we know shouldOffer
             const pc = createPeerConnection(peerId);
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            socket.emit('offer', { target: peerId, sdp: offer });
-        });
 
-        socket.on('offer', async (data) => {
-            const { sender, sdp } = data;
-            if (!sender) return;
-            console.log('Received offer from:', sender);
-            const pc = createPeerConnection(sender);
-            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            socket.emit('answer', { target: sender, sdp: answer });
-        });
+            // If server included shouldOffer flag, use it; otherwise, default heuristics:
+            const shouldOffer = data.shouldOffer ?? true;
 
-        socket.on('answer', async (data) => {
-            const { sender, sdp } = data;
-            if (!sender) return;
-            console.log('Received answer from:', sender);
-            const pc = createPeerConnection(sender);
-            await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-        });
-
-        socket.on('ice-candidate', async (data) => {
-            const { sender, candidate } = data;
-            if (!sender) return;
-            const pc = createPeerConnection(sender);
-            await pc.addIceCandidate(new RTCIceCandidate(candidate));
-        });
-
-        socket.on('user-left', (data) => {
-            const { socketId } = data;
-            console.log(`User left: ${socketId}`);
-            if (peerConnections.current[socketId]) {
-                peerConnections.current[socketId].close();
-                delete peerConnections.current[socketId];
+            // If we should offer, kick off offer flow (but guard double-offer)
+            if (shouldOffer) {
+                // Wait a tiny tick to ensure pc is ready and local tracks added
+                setTimeout(() => {
+                    createAndSendOffer(peerId);
+                }, 50);
             }
-            removeRemoteStream(socketId);
         });
 
+        // join-success: when we join an existing room, receive peers list
+        socket.on('join-success', async (data: any) => {
+            console.log('socket.on(join-success)', data);
+            setCallState('connected');
+            setInCall(true);
+
+            // Add peers to local store (they will eventually fire user-joined too or we initiate connections)
+            if (Array.isArray(data.peers)) {
+                for (const p of data.peers) {
+                    addParticipant({
+                        id: p.id,
+                        userId: undefined,
+                        displayName: p.displayName,
+                        isMuted: false,
+                        isVideoOff: false,
+                        reputation: p.reputation,
+                        avatarUrl: p.avatarUrl,
+                        shouldOffer: p.shouldOffer ?? true
+                    });
+
+                    // If server didn't emit user-joined, proactively create PC and offer if needed
+                    if (p.shouldOffer ?? true) {
+                        // small delay to avoid simultaneous offers causing glare
+                        setTimeout(() => createAndSendOffer(p.id), 80);
+                    }
+                }
+            }
+        });
+
+        // recommendation events (UI-level) - pass through to UI store or toast
+        socket.on('recommendation-received', (payload: any) => {
+            console.log('recommendation-received', payload);
+            // UI handles these; we don't start negotiation until accepted by everyone
+        });
+
+        socket.on('recommendation-ended', (payload: any) => {
+            console.log('recommendation-ended', payload);
+        });
+
+        socket.on('call-ended', (payload: any) => {
+            console.log('call-ended', payload);
+            abortCall();
+        });
+
+        socket.on('peer-left', (payload: { peerId: string }) => {
+            console.log('peer-left', payload);
+            removePeer(payload.peerId);
+        });
+
+        // Clean up on unmount
         return () => {
-            socket.off('match-found');
-            socket.off('user-joined');
             socket.off('offer');
             socket.off('answer');
             socket.off('ice-candidate');
-            socket.off('user-left');
+            socket.off('user-joined');
+            socket.off('join-success');
+            socket.off('recommendation-received');
+            socket.off('recommendation-ended');
+            socket.off('call-ended');
+            socket.off('peer-left');
         };
-    }, [socket, createPeerConnection, removeRemoteStream, setCallState]);
+    }, [
+        socket,
+        handleOffer,
+        handleAnswer,
+        handleRemoteIce,
+        createPeerConnection,
+        createAndSendOffer,
+        abortCall,
+        removePeer,
+        addParticipant,
+        setCallState,
+        setInCall
+    ]);
 
-    const handleAddRandomUser = useCallback(() => {
-        if (socket) {
-            socket.emit('add-user');
-        }
-    }, [socket]);
-
-    const acceptMatch = useCallback(async () => {
-        const { participants, isInitiator } = useCallStore.getState();
-        setCallState('connecting');
-
-        // If we are initiator, we send the offer NOW.
-        // If we are not initiator, we wait for the offer (which the other side sends when THEY accept).
-        // Actually, in a symmetric match, both might accept.
-        // The 'initiator' flag from backend decides who sends the offer.
-
-        // We need to check if we should initiate to any peer.
-        participants.forEach(peer => {
-            // Check if we should initiate connection to this peer
-            // Use shouldOffer flag from participant, fallback to isInitiator for legacy/single peer
-            // In the new logic, 'initiator' is passed in match-found.
-            // But we didn't save it to the participant.
-            // We saved 'isInitiator' to the store.
-
-            // If I am the initiator, I send offer.
-            if (isInitiator && !peerConnections.current[peer.id]) {
-                console.log(`Initiating call to: ${peer.id}`);
-                const pc = createPeerConnection(peer.id);
-                pc.createOffer().then(offer => {
-                    pc.setLocalDescription(offer);
-                    socket?.emit('offer', { target: peer.id, sdp: offer });
-                });
-            }
+    // when localStream changes, replace tracks for existing PCS
+    useEffect(() => {
+        if (!localStream) return;
+        Object.values(pcs.current).forEach(pc => {
+            const sender = pc.getSenders().find(s => s.track && s.track.kind === 'video');
+            const localTrack = localStream.getVideoTracks()[0];
+            if (sender && localTrack) sender.replaceTrack(localTrack);
+            else if (localTrack) pc.addTrack(localTrack, localStream);
+            const audioSender = pc.getSenders().find(s => s.track && s.track.kind === 'audio');
+            const audioTrack = localStream.getAudioTracks()[0];
+            if (audioSender && audioTrack) audioSender.replaceTrack(audioTrack);
+            else if (audioTrack) pc.addTrack(audioTrack, localStream);
         });
-    }, [createPeerConnection, socket, setCallState]);
-
-    const handleSkipMatch = useCallback((peerId?: string) => {
-        // Close all connections
-        Object.values(peerConnections.current).forEach(pc => pc.close());
-        peerConnections.current = {};
-        setRoomId(null);
-
-        skipMatch(peerId); // This triggers find-match again on backend if we want
-        // Actually skipMatch in useSignaling emits 'skip-match'
-    }, [skipMatch]);
-
-    const toggleMic = useCallback(() => {
-        const { toggleMute, isMuted, participants } = useCallStore.getState();
-        toggleMute();
-        const newMutedState = !isMuted;
-        participants.forEach(p => {
-            socket?.emit('media-state-change', { target: p.id, isMuted: newMutedState });
-        });
-    }, [socket]);
-
-    const toggleCam = useCallback(() => {
-        const { toggleVideo, isVideoOff, participants } = useCallStore.getState();
-        toggleVideo();
-        const newVideoState = !isVideoOff;
-        participants.forEach(p => {
-            socket?.emit('media-state-change', { target: p.id, isVideoOff: newVideoState });
-        });
-    }, [socket]);
-
-    const toggleScreenShare = useCallback(async () => {
-        // ... (Keep existing screen share logic, iterating over peerConnections.current)
-        // For brevity, assuming it iterates over all PCs
-        try {
-            const { isScreenSharing, setIsScreenSharing } = useCallStore.getState();
-            // ... implementation same as before but loop over peerConnections.current
-        } catch (err) {
-            console.error(err);
-        }
     }, [localStream]);
 
-    const abortCall = useCallback(() => {
-        console.log('Aborting call...');
-        Object.values(peerConnections.current).forEach(pc => pc.close());
-        peerConnections.current = {};
-        setRoomId(null);
-        resetCall(true);
-        socket?.emit('leave-queue');
-    }, [socket, resetCall]);
+    // cleanup full state on unmount
+    useEffect(() => {
+        return () => {
+            Object.keys(pcs.current).forEach(pid => {
+                try { pcs.current[pid].close(); } catch { }
+                delete pcs.current[pid];
+            });
+            pendingCandidates.current = {};
+            remoteStreams.current = {};
+        };
+    }, []);
 
     return {
-        socket,
+        // state
         localStream,
+        isMicOn,
+        isCamOn,
+        isScreenSharing,
+        remoteStreams: remoteStreams.current,
+        // methods
         findMatch,
-        sendMessage,
-        skipMatch: handleSkipMatch,
-        toggleScreenShare,
-        addRandomUser: handleAddRandomUser,
         acceptMatch,
-        toggleMic,
-        toggleCam,
+        sendMessage,
+        skipMatch,
+        addRandomUser,
         inviteUser,
         acceptInvite,
         rejectInvite,
         abortCall,
-        roomId
+        toggleMic,
+        toggleCam,
+        toggleScreenShare,
+        socket
     };
-};
+}
 
+export default useWebRTC;

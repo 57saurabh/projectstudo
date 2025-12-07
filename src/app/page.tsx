@@ -209,8 +209,26 @@ export default function DashboardPage() {
                                         />
                                         <div className="absolute bottom-0 right-0 w-3 h-3 bg-gold rounded-full border-2 border-surface" />
                                     </div>
-                                    <span className="hidden lg:block text-xs font-medium text-text-primary text-center truncate w-full">{(u.displayName || u.username || 'User').split(' ')[0]}</span>
-                                    <button className="p-1 rounded-full bg-surface border border-border hover:bg-gold hover:text-background hover:border-gold transition-colors text-text-muted">
+                                    <span className="text-xs font-medium text-text-primary text-center truncate w-full max-w-[80px]">{(u.displayName || u.username || 'User').split(' ')[0]}</span>
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const token = localStorage.getItem('token');
+                                                await axios.post('/api/users/friend-request', {
+                                                    targetUserId: u._id,
+                                                    action: 'send'
+                                                }, {
+                                                    headers: { Authorization: `Bearer ${token}` }
+                                                });
+                                                // Remove user from list or show success state
+                                                setRecommendedUsers(prev => prev.filter(user => user._id !== u._id));
+                                            } catch (error) {
+                                                console.error('Failed to send friend request', error);
+                                            }
+                                        }}
+                                        className="p-1 rounded-full bg-surface border border-border hover:bg-gold hover:text-background hover:border-gold transition-colors text-text-muted"
+                                        title="Add Friend"
+                                    >
                                         <UserPlus size={12} />
                                     </button>
                                 </div>

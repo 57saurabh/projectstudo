@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Search, UserPlus, UserCheck, UserX, Loader2 } from 'lucide-react';
 import { debounce } from 'lodash';
 import { toast } from 'react-hot-toast';
@@ -18,8 +18,38 @@ interface SearchResult {
 export default function DiscoverPage() {
     const [query, setQuery] = useState('');
     const [results, setResults] = useState<SearchResult[]>([]);
+    const [recommendations, setRecommendations] = useState<SearchResult[]>([]);
     const [loading, setLoading] = useState(false);
     const [searching, setSearching] = useState(false);
+
+    useEffect(() => {
+        fetchRecommendations();
+    }, []);
+
+    const fetchRecommendations = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch('/api/users/recommended', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                // Map recommendations to match SearchResult interface if needed
+                // Assuming recommendations endpoint returns similar structure or we adapt it
+                // We might need to fetch status for these too, or endpoint should return it.
+                // For now assuming endpoint returns basic user data, we'll map status as 'none' initially
+                // Ideally recommended endpoint should return this status.
+                const mapped = data.map((u: any) => ({
+                    ...u,
+                    friendStatus: 'none', // Default, logic should be improved ideally
+                    isFollowing: false     // Default
+                }));
+                setRecommendations(mapped);
+            }
+        } catch (error) {
+            console.error('Failed to fetch recommendations', error);
+        }
+    };
 
     const searchUsers = async (searchQuery: string) => {
         if (!searchQuery.trim()) {
@@ -70,12 +100,16 @@ export default function DiscoverPage() {
 
             if (res.ok) {
                 const data = await res.json();
-                setResults(prev => prev.map(user => {
+                const updateList = (list: SearchResult[]) => list.map(user => {
                     if (user._id === userId) {
                         return { ...user, friendStatus: data.status };
                     }
                     return user;
-                }));
+                });
+
+                setResults(prev => updateList(prev));
+                setRecommendations(prev => updateList(prev));
+
                 toast.success(data.message);
             } else {
                 const error = await res.json();
@@ -101,12 +135,16 @@ export default function DiscoverPage() {
 
             if (res.ok) {
                 const data = await res.json();
-                setResults(prev => prev.map(user => {
+                const updateList = (list: SearchResult[]) => list.map(user => {
                     if (user._id === userId) {
                         return { ...user, isFollowing: data.isFollowing };
                     }
                     return user;
-                }));
+                });
+
+                setResults(prev => updateList(prev));
+                setRecommendations(prev => updateList(prev));
+
                 toast.success(data.message);
             } else {
                 const error = await res.json();
@@ -117,6 +155,9 @@ export default function DiscoverPage() {
             toast.error('Action failed');
         }
     };
+
+    const displayList = query ? results : recommendations;
+    const isRecommendations = !query && recommendations.length > 0;
 
     return (
         <div className="h-full bg-background text-text-primary p-6 md:p-10 flex flex-col gap-6 overflow-hidden">
@@ -139,13 +180,17 @@ export default function DiscoverPage() {
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2">
+                {isRecommendations && (
+                    <h2 className="text-xl font-semibold mb-4 text-text-secondary">You may know</h2>
+                )}
+
                 {query && results.length === 0 && !searching ? (
                     <div className="text-center text-text-secondary py-10">
                         No users found matching "{query}"
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {results.map(user => (
+                        {displayList.map(user => (
                             <div key={user._id} className="bg-surface p-4 rounded-xl border border-border hover:border-primary/50 transition-colors flex flex-col gap-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-12 h-12 rounded-full bg-surface-hover overflow-hidden shrink-0">
@@ -202,8 +247,8 @@ export default function DiscoverPage() {
                                     <button
                                         onClick={() => handleFollow(user._id, user.isFollowing ? 'unfollow' : 'follow')}
                                         className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${user.isFollowing
-                                                ? 'border-border text-text-secondary hover:border-red-500/50 hover:text-red-500'
-                                                : 'border-primary text-primary hover:bg-primary/10'
+                                            ? 'border-border text-text-secondary hover:border-red-500/50 hover:text-red-500'
+                                            : 'border-primary text-primary hover:bg-primary/10'
                                             }`}
                                     >
                                         {user.isFollowing ? 'Following' : 'Follow'}
@@ -214,7 +259,7 @@ export default function DiscoverPage() {
                     </div>
                 )}
 
-                {!query && (
+                {!query && recommendations.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-64 text-text-secondary">
                         <Search size={48} className="mb-4 opacity-20" />
                         <p>Search for people to add or follow</p>
