@@ -1,5 +1,5 @@
 import { Flag } from 'lucide-react';
-import { Participant } from '@/lib/store/useCallStore';
+import { ParticipantPublic as Participant } from '@/lib/store/useCallStore';
 
 interface MatchOverlayProps {
     callState: string;
@@ -24,6 +24,8 @@ export default function MatchOverlay({
     onAbort,
     onRetry
 }: MatchOverlayProps) {
+
+
     if (callState === 'connecting') {
         return (
             <div className="absolute inset-0 z-40 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center">
@@ -33,7 +35,7 @@ export default function MatchOverlay({
                 {currentPeer && (
                     <div className="flex flex-col items-center mb-6">
                         <img
-                            src={currentPeer.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentPeer.id}`}
+                            src={currentPeer.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentPeer.peerId}`}
                             alt="Avatar"
                             className="w-16 h-16 rounded-full border-2 border-white/20 mb-2"
                         />
@@ -68,7 +70,7 @@ export default function MatchOverlay({
                 )}
                 <div className="relative w-32 h-32 rounded-full border-4 border-[#191121] overflow-hidden bg-gray-800 z-10">
                     <img
-                        src={currentPeer.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentPeer.id}`}
+                        src={currentPeer.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentPeer.peerId}`}
                         alt="Peer Avatar"
                         className="w-full h-full object-cover"
                     />
@@ -112,8 +114,8 @@ export default function MatchOverlay({
                     }}
                     disabled={hasAccepted}
                     className={`flex-1 py-3 rounded-xl font-bold transition-all shadow-lg flex items-center justify-center gap-2 ${hasAccepted
-                            ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 cursor-wait'
-                            : 'bg-[#7f19e6] text-white hover:bg-[#6d14c4] shadow-[#7f19e6]/20'
+                        ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 cursor-wait'
+                        : 'bg-[#7f19e6] text-white hover:bg-[#6d14c4] shadow-[#7f19e6]/20'
                         }`}
                 >
                     {hasAccepted ? (

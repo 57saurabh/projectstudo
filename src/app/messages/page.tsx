@@ -4,9 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, Search, Send, ArrowLeft, Clock, Check, CheckCheck, Plus } from 'lucide-react';
 import { useSelector } from 'react-redux';
 import { RootState } from '@/lib/store/store';
-import axios from 'axios';
-import { useSignaling } from '@/lib/webrtc/useSignaling';
-import GroupsView from '@/components/groups/GroupsView';
+import axios from 'axios'; import { useSignaling } from '@/lib/webrtc/SignalingContext'; import GroupsView from '@/components/groups/GroupsView';
 
 type ConversationUser = {
     displayName: string;

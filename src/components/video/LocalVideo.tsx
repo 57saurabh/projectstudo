@@ -6,7 +6,8 @@ import { useCallStore } from '@/lib/store/useCallStore';
 
 export default function LocalVideo() {
     const videoRef = useRef<HTMLVideoElement>(null);
-    const { localStream, isVideoOff } = useCallStore();
+    const { localStream } = useCallStore();
+    const isVideoOff = false; // Default until toggle logic is restored in store
     const { user } = useSelector((state: RootState) => state.auth);
 
     useEffect(() => {

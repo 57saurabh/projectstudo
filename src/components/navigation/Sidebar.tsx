@@ -22,8 +22,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { logout } from '@/lib/store/authSlice';
 import { useRouter } from 'next/navigation';
 import { useSidebar } from '@/components/layout/SidebarContext';
-import { useSignaling } from '@/lib/webrtc/useSignaling';
-
+import { useSignaling } from '@/lib/webrtc/SignalingContext';
 export default function Sidebar() {
     const { isOpen, toggleSidebar, closeSidebar } = useSidebar();
     const pathname = usePathname();

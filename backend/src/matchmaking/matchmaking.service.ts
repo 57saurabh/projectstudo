@@ -1,168 +1,134 @@
 // matchmaking.service.ts
-import { v4 as uuidv4 } from 'uuid';
+import Redis from 'ioredis';
+
+export interface QueueItem {
+  id: string;
+  type: 'user' | 'room';
+  score?: number;
+}
 
 /**
- * MatchmakingService
+ * Redis-backed MatchmakingService (OPTION 1)
  *
- * Responsibilities:
- *  - Maintain queue of idle users
- *  - Auto-match idle users in pairs (A+B, C+D...)
- *  - Manage room participant lists
- *  - Provide idle users for recommendation
+ * - Queue: Redis LIST 'match:queue' (JSON entries)
+ * - Reservation lock: 'lock:{id}' (SETNX + EX)
+ * - Rooms: managed via RoomService (Redis)
  *
- * This service NEVER auto-adds users to rooms during recommendation.
+ * The service exposes reservation primitives and queue helpers.
  */
 
 export class MatchmakingService {
-    // waiting users (idle)
-    private queue: string[] = [];
+  private redis: Redis.Redis;
+  private readonly QUEUE_KEY = 'match:queue';
+  private readonly LOCK_PREFIX = 'lock:'; // lock:{id}
+  private readonly LOCK_TTL_SEC = 35; // TTL for lock (seconds)
+  private readonly MAX_ROOM_SIZE = 10;
 
-    // active rooms
-    private rooms: Map<string, { id: string; participants: string[] }> = new Map();
+  constructor(redisUrl?: string) {
+    const url = redisUrl || process.env.REDIS_URL || 'redis://127.0.0.1:6379';
+    this.redis = new Redis(url);
+    this.redis.on('error', (err) => console.error('[Matchmaking][Redis] error', err));
+    console.log('[Matchmaking] connected to Redis at', url);
+  }
 
-    // auto-match results to be picked by gateway
-    private pendingMatches: { roomId: string; peers: string[] }[] = [];
+  // Add JSON entry to queue (push right, consume left)
+  async addToQueue(id: string, type: 'user' | 'room') {
+    const entry = JSON.stringify({ id, type });
+    await this.redis.rpush(this.QUEUE_KEY, entry);
+    console.log(`[Matchmaking] + queued ${type} ${id}`);
+    await this.redis.publish('match:events', JSON.stringify({ event: 'queue:add', id, type }));
+  }
 
-    // max users per room
-    private readonly MAX_ROOM_SIZE = 9;
+  // Remove all occurrences of id from queue (best-effort)
+  async removeFromQueue(id: string) {
+    // attempt direct JSON removals for both types and fallback scanning
+    await this.redis.lrem(this.QUEUE_KEY, 0, JSON.stringify({ id, type: 'user' }));
+    await this.redis.lrem(this.QUEUE_KEY, 0, JSON.stringify({ id, type: 'room' }));
 
-    // -----------------------------------------------------------
-    // ADD USER TO QUEUE & AUTO-MATCH PAIRS
-    // -----------------------------------------------------------
-    async addToQueue(socketId: string) {
-        if (!this.queue.includes(socketId)) {
-            this.queue.push(socketId);
-            console.log(`[Matchmaking] + Added to queue: ${socketId}`);
+    const snapshot = await this.redis.lrange(this.QUEUE_KEY, 0, -1);
+    for (const raw of snapshot) {
+      try {
+        const obj = JSON.parse(raw);
+        if (obj && obj.id === id) {
+          await this.redis.lrem(this.QUEUE_KEY, 0, raw);
         }
-        this.autoMatch();
+      } catch { /* ignore */ }
+    }
+    console.log(`[Matchmaking] - removed ${id} from queue (if existed)`);
+  }
+
+  // Reserve id via SETNX with TTL. Returns true if reserved.
+  async reserve(id: string): Promise<boolean> {
+    const key = this.LOCK_PREFIX + id;
+    try {
+      const res = await this.redis.set(key, '1', 'NX', 'EX', this.LOCK_TTL_SEC);
+      const ok = res === 'OK';
+      console.log(`[Matchmaking] reserve ${id} -> ${ok ? 'OK' : 'BUSY'}`);
+      return ok;
+    } catch (e) {
+      console.error('[Matchmaking] reserve error', e);
+      return false;
+    }
+  }
+
+  async release(id: string) {
+    const key = this.LOCK_PREFIX + id;
+    await this.redis.del(key);
+    console.log(`[Matchmaking] release ${id}`);
+  }
+
+  async isReserved(id: string): Promise<boolean> {
+    const key = this.LOCK_PREFIX + id;
+    const exists = await this.redis.exists(key);
+    return exists === 1;
+  }
+
+  // Find one candidate for seekerId. This scans queue snapshot, tries to reserve candidate + seeker.
+  async findMatchCandidate(seekerId: string, seekerType: 'user' | 'room'): Promise<QueueItem | null> {
+    const snapshot = await this.redis.lrange(this.QUEUE_KEY, 0, -1);
+    console.log(`[Matchmaking] scanning queue for seeker ${seekerType}:${seekerId} (len=${snapshot.length})`);
+
+    for (const raw of snapshot) {
+      let item: QueueItem | null = null;
+      try { item = JSON.parse(raw); } catch { continue; }
+      if (!item) continue;
+      if (item.id === seekerId) continue;
+      if (seekerType === 'room' && item.type !== 'user') continue;
+
+      // attempt reserve candidate then seeker
+      const candidateReserved = await this.reserve(item.id);
+      if (!candidateReserved) continue;
+
+      const seekerReserved = await this.reserve(seekerId);
+      if (!seekerReserved) {
+        await this.release(item.id);
+        continue;
+      }
+
+      // remove this candidate occurrence (best-effort) and remove seeker occurrences
+      await this.redis.lrem(this.QUEUE_KEY, 1, raw);
+      await this.removeFromQueue(seekerId);
+
+      console.log(`[Matchmaking] reserved pair seeker=${seekerId} candidate=${item.id}`);
+      return item;
     }
 
-    // -----------------------------------------------------------
-    // AUTO-MATCH IN PARALLEL
-    // -----------------------------------------------------------
-    private autoMatch() {
-        while (this.queue.length >= 2) {
-            const a = this.queue.shift()!;
-            const b = this.queue.shift()!;
-            const roomId = uuidv4();
+    return null;
+  }
 
-            this.rooms.set(roomId, {
-                id: roomId,
-                participants: [a, b],
-            });
-
-            console.log(`[Matchmaking] MATCH → ${a} ↔ ${b} in room ${roomId}`);
-
-            this.pendingMatches.push({
-                roomId,
-                peers: [a, b]
-            });
-        }
+  async releaseReservations(ids: string[]) {
+    for (const id of ids) {
+      await this.release(id);
     }
+  }
 
-    // -----------------------------------------------------------
-    // GET NEW MATCHES FOR SOCKET GATEWAY
-    // -----------------------------------------------------------
-    getPendingMatches() {
-        const out = [...this.pendingMatches];
-        this.pendingMatches = [];
-        return out;
+  // For debugging: get snapshot of queue
+  async getQueue(): Promise<QueueItem[]> {
+    const raw = await this.redis.lrange(this.QUEUE_KEY, 0, -1);
+    const out: QueueItem[] = [];
+    for (const r of raw) {
+      try { out.push(JSON.parse(r)); } catch { /* ignore */ }
     }
-
-    // -----------------------------------------------------------
-    // FIND NEXT USER FOR RECOMMENDATION
-    // DOES NOT JOIN ROOM — ONLY RETURNS CANDIDATE
-    // -----------------------------------------------------------
-    async findPeerForRecommendation(
-        roomId: string,
-        currentParticipants: string[]
-    ): Promise<string | null> {
-
-        const room = this.rooms.get(roomId);
-        if (!room) {
-            console.log(`[Matchmaking] Recommendation failed → room not found`);
-            return null;
-        }
-
-        if (room.participants.length >= this.MAX_ROOM_SIZE) {
-            console.log(`[Matchmaking] Room ${roomId} full (${room.participants.length}/9)`);
-            return null;
-        }
-
-        // candidate = first idle user not in this room
-        const candidate = this.queue.find(id => !currentParticipants.includes(id));
-
-        if (!candidate) {
-            console.log(`[Matchmaking] No candidate found for room ${roomId}`);
-            return null;
-        }
-
-        // REMOVE FROM QUEUE (to prevent being matched elsewhere)
-        this.removeFromQueue(candidate);
-
-        console.log(`[Matchmaking] Recommendation → ${candidate} for room ${roomId}`);
-
-        return candidate;
-    }
-
-    // -----------------------------------------------------------
-    // REMOVE USER FROM QUEUE ONLY
-    // -----------------------------------------------------------
-    removeFromQueue(socketId: string) {
-        const before = this.queue.length;
-        this.queue = this.queue.filter(id => id !== socketId);
-        if (this.queue.length !== before) {
-            console.log(`[Matchmaking] - Removed from queue: ${socketId}`);
-        }
-    }
-
-    // -----------------------------------------------------------
-    // REMOVE USER FROM ROOM
-    // -----------------------------------------------------------
-    removeUser(socketId: string): { roomId: string; remaining: string[] } | null {
-        // Always remove from queue
-        this.removeFromQueue(socketId);
-
-        for (const [roomId, room] of this.rooms.entries()) {
-            if (room.participants.includes(socketId)) {
-                room.participants = room.participants.filter(id => id !== socketId);
-
-                console.log(`[Matchmaking] User ${socketId} removed from room ${roomId}`);
-
-                const result = {
-                    roomId,
-                    remaining: [...room.participants],
-                };
-
-                if (room.participants.length === 0) {
-                    this.rooms.delete(roomId);
-                    console.log(`[Matchmaking] Room ${roomId} deleted (empty)`);
-                }
-
-                return result;
-            }
-        }
-
-        return null;
-    }
-
-    // -----------------------------------------------------------
-    // DEBUGGING HELPERS
-    // -----------------------------------------------------------
-    getRooms() {
-        return [...this.rooms.values()];
-    }
-
-    getQueue() {
-        return [...this.queue];
-    }
-
-    // -----------------------------------------------------------
-    // GET SUGGESTIONS FOR IDLE USERS (Chatroulette-style)
-    // -----------------------------------------------------------
-    getSuggestions(excludeId: string): string[] {
-        return this.queue
-            .filter(id => id !== excludeId)
-            .slice(0, 5);
-    }
+    return out;
+  }
 }

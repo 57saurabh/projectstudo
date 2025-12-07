@@ -1,5 +1,5 @@
-import { useSignalingContext } from './SignalingContext';
+// src/lib/webrtc/useSignaling.ts
+'use client';
+import { useSignaling } from './SignalingContext';
 
-export const useSignaling = () => {
-    return useSignalingContext();
-};
+export default useSignaling;

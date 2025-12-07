@@ -111,7 +111,71 @@ export interface IUser {
     status?: string;
     lastActive?: number;
 
-    // Complex fields omitted for brevity but still in schema
+    // Complex fields
+    stories?: {
+        id: string;
+        mediaUrl: string;
+        caption?: string;
+        views: number;
+        createdAt: number;
+        expiresAt: number;
+    }[];
+
+    highlights?: {
+        id: string;
+        title: string;
+        coverImageUrl: string;
+        storyIds: string[];
+        createdAt: number;
+    }[];
+
+    blockedUsers?: string[];
+    mutedUsers?: string[];
+    savedStories?: string[];
+
+    insights?: {
+        profileVisits: number;
+        reach: number;
+        impressions: number;
+        engagementRate: number;
+    };
+
+    privacy?: {
+        isPrivate: boolean;
+        allowMessagesFrom: string;
+        allowStoryRepliesFrom: string;
+        allowTagging: string;
+        twoFactorEnabled: boolean;
+    };
+
+    preferences?: {
+        matchGender: string;
+        matchRegion: string;
+        minAge?: number;
+        maxAge?: number;
+        region?: string[];
+        languages?: string[];
+        languageCountries?: string[];
+    };
+
+    connection?: {
+        socketId?: string;
+        roomId?: string;
+        isCameraOn?: boolean;
+        isMicOn?: boolean;
+    };
+
+    reports?: {
+        count: number;
+        reasons: string[];
+    };
+
+    isBanned?: boolean;
+    reputationScore?: number;
+
+    currentIP?: string;
+    currentLocation?: any;
+    signupLocation?: any;
 }
 
 // Extend Mongoose Document

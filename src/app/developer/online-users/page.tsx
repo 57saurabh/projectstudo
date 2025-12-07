@@ -1,7 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { useSignaling } from '@/lib/webrtc/useSignaling';
-import { Users } from 'lucide-react';
+import { useEffect, useState } from 'react'; import { useSignaling } from '@/lib/webrtc/SignalingContext'; import { Users } from 'lucide-react';
 
 interface OnlineUser {
     id: string;
