@@ -53,60 +53,50 @@ export default function Header() {
         <motion.header
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="flex items-center justify-between px-4 py-3 mx-2 mt-2 lg:px-8 lg:py-4 lg:mx-4 lg:mt-4 mb-0 bg-surface/80 backdrop-blur-xl border border-border rounded-3xl shadow-lg z-30 sticky top-2 lg:top-4 transition-colors duration-300"
+            className="flex items-center justify-between px-4 py-3 mx-2 mt-2 lg:px-8 lg:py-4 lg:mx-4 lg:mt-4 mb-0 bg-surface/80 backdrop-blur-xl border border-border rounded-3xl shadow-lg z-30 sticky top-2 lg:top-4 transition-colors duration-300 relative"
         >
-            {/* Left: Title / Breadcrumbs */}
-            <div className="flex items-center gap-4">
-                {pathname === '/' ? (
-                    <div className="flex flex-col">
-                        <h1 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2">
-                            Hey, <span className="text-gold">{user?.username || 'Stranger'}</span>
-                        </h1>
-                        <p className="text-xs text-text-secondary font-medium">Ready to cause some chaos?</p>
-                    </div>
-                ) : (
+            {/* Left: Logo (Mobile) / Title (Desktop) */}
+            <div className="flex items-center gap-4 z-20">
+                <div className="lg:hidden">
+                    <img src="/logomain.png" alt="Socialin" className="h-8 w-auto object-contain" />
+                </div>
+
+                <div className="hidden lg:flex items-center gap-4">
                     <h1 className="text-2xl font-black tracking-tight text-primary">
                         {title}
                     </h1>
-                )}
+                </div>
+            </div>
+
+            {/* Center: Title (Mobile Only) */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 lg:hidden">
+                <h1 className="text-xl font-black tracking-tight text-primary">
+                    {title}
+                </h1>
             </div>
 
             {/* Right: Actions & Profile */}
-            <div className="flex items-center gap-6">
-                {/* Search Bar (Removed) */}
-
+            <div className="flex items-center gap-3 lg:gap-6 z-20">
                 {/* Icons */}
-                <div className="flex items-center gap-3">
-                    <button className="p-2.5 rounded-2xl hover:bg-surface-hover text-text-secondary hover:text-gold transition-colors relative shadow-sm hover:shadow-gold/10">
+                <div className="flex items-center gap-2">
+                    <button className="p-2 lg:p-2.5 rounded-2xl hover:bg-surface-hover text-text-secondary hover:text-gold transition-colors relative shadow-sm hover:shadow-gold/10">
                         <Bell size={20} />
                         <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-danger rounded-full border-2 border-surface shadow-danger-glow" />
                     </button>
-                    <Link href="/settings">
-                        <button className="p-2.5 rounded-2xl hover:bg-surface-hover text-text-secondary hover:text-gold transition-colors shadow-sm hover:shadow-gold/10">
-                            <Settings size={20} />
-                        </button>
-                    </Link>
+                    {/* Settings Icon Removed */}
                 </div>
 
                 {/* Separator */}
-                <div className="w-px h-8 bg-border" />
+                <div className="w-px h-6 lg:h-8 bg-border" />
 
                 {/* User Profile Dropdown */}
                 <div className="relative" ref={dropdownRef}>
                     <button
                         onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                        className="flex items-center gap-3 pl-2 group outline-none"
+                        className="flex items-center gap-3 pl-1 lg:pl-2 group outline-none"
                     >
-                        <div className="hidden md:flex flex-col items-end">
-                            <span className="text-sm font-bold text-text-primary group-hover:text-gold transition-colors">
-                                {user?.displayName || 'Guest'}
-                            </span>
-                            <span className="text-xs font-bold text-orange tracking-wider">
-                                {user?.reputationScore || 0} XP
-                            </span>
-                        </div>
                         <div className="relative">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-gold to-orange p-[2px] shadow-gold-glow group-hover:scale-105 transition-all duration-300">
+                            <div className="w-9 h-9 lg:w-12 lg:h-12 rounded-2xl bg-gradient-to-br from-gold to-orange p-[2px] shadow-gold-glow group-hover:scale-105 transition-all duration-300">
                                 <div className="w-full h-full rounded-[14px] bg-surface flex items-center justify-center overflow-hidden">
                                     {user?.avatarUrl ? (
                                         <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
@@ -117,7 +107,7 @@ export default function Header() {
                                     )}
                                 </div>
                             </div>
-                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-surface rounded-full shadow-lg" />
+                            <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 lg:w-4 lg:h-4 bg-green-500 border-2 border-surface rounded-full shadow-lg" />
                         </div>
                     </button>
 

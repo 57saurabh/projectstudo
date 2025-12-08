@@ -488,7 +488,7 @@ export default function PublicProfilePage() {
                                     <div className="bg-surface border border-border rounded-3xl p-6 shadow-sm min-h-[400px] flex flex-col items-center justify-center text-text-muted">
                                         <Users size={48} className="mb-4 opacity-50" />
                                         <p className="text-lg font-medium">Followers feature coming soon.</p>
-                                        {profileUser.followers > 0 && (
+                                        {profileUser.followers && profileUser.followers.length > 0 && (
                                             <p className="mt-2 text-gold font-bold">{profileUser.followers} Followers</p>
                                         )}
                                     </div>

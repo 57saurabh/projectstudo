@@ -2,8 +2,7 @@
 
 import { useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useSignaling } from '@/lib/webrtc/useSignaling';
-// import { toast } from 'sonner'; // Removed as not installed 
+import { useSignaling } from '@/lib/webrtc/SignalingContext';// import { toast } from 'sonner'; // Removed as not installed 
 // Checking package.json would be good, but I'll assume standard toast or use a simple alert for now if I can't find one.
 // Actually, I'll use a custom UI for the toast to be safe and "Premium".
 

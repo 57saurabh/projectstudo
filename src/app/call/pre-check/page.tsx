@@ -18,7 +18,11 @@ import Input from '@/components/ui/Input';
 export default function PreCheckPage() {
     const router = useRouter();
     // Initialize WebRTC (requests permissions and starts stream)
-    useWebRTC();
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
+    // Initialize WebRTC (requests permissions and starts stream)
+    useWebRTC(videoRef);
 
     const { localStream } = useCallStore();
     // Get token from Redux
@@ -27,8 +31,6 @@ export default function PreCheckPage() {
     const [faceDetected, setFaceDetected] = useState(false);
     const [checkStatus, setCheckStatus] = useState<'success' | 'failed' | null>(null);
     const [statusMessage, setStatusMessage] = useState('');
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
 
     // Profile State
     const [user, setUser] = useState<any>(null);

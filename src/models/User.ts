@@ -117,8 +117,8 @@ export interface IUser {
     category?: string;
 
     // Social metrics
-    followers: number;
-    following: number;
+    followers: string[];
+    following: string[];
     friends: string[]; // Array of User IDs
     connectedAccounts: {
         youtube?: { connected: boolean; token?: string; channelId?: string };

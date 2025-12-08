@@ -27,11 +27,21 @@ export async function GET(req: Request) {
         // Find users excluding the current user
         // In a real app, this would be smarter (e.g., based on interests, location)
         // For now, just random users
-        const query = currentUserId ? { _id: { $ne: currentUserId } } : {};
+        let query: any = {};
+
+        if (currentUserId) {
+            const currentUser = await User.findById(currentUserId).select('friends');
+            const friendIds = currentUser?.friends || [];
+
+            // Ensure friendIds is an array (safety check)
+            const excludeIds = Array.isArray(friendIds) ? [...friendIds, currentUserId] : [currentUserId];
+
+            query = { _id: { $nin: excludeIds } };
+        }
 
         const users = await User.find(query)
             .select('displayName username avatarUrl')
-            .limit(10);
+            .limit(20);
 
         // Shuffle array to make it look "random"
         const shuffled = users.sort(() => 0.5 - Math.random()).slice(0, 5);

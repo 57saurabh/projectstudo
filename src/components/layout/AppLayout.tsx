@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/navigation/Sidebar';
+import BottomNav from '@/components/navigation/BottomNav';
 import Header from '@/components/layout/Header';
 import { SidebarProvider, useSidebar } from './SidebarContext';
 import { useRef, useEffect } from 'react';
@@ -21,11 +22,12 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     return (
         <div className="flex h-screen bg-background overflow-hidden transition-colors duration-300">
             {!isAuthPage && <Sidebar />}
+            {!isAuthPage && <BottomNav />}
             <div className="flex flex-col flex-1 h-screen overflow-hidden">
                 {!isAuthPage && <Header />}
                 <main
                     ref={mainRef}
-                    className={`flex-1 overflow-y-auto transition-all duration-300 ease-in-out flex flex-col ${!isAuthPage ? 'w-full' : ''
+                    className={`flex-1 overflow-y-auto transition-all duration-300 ease-in-out flex flex-col ${!isAuthPage ? 'w-full pb-20 lg:pb-0' : ''
                         }`}
                 >
                     <div className="flex-1 p-2 lg:p-4">

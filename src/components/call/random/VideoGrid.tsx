@@ -1,5 +1,5 @@
 import RemoteVideo from '@/components/video/RemoteVideo';
-import { Participant } from '@/lib/store/useCallStore';
+import { ParticipantPublic as Participant } from '@/lib/store/useCallStore';
 
 interface VideoGridProps {
     participants: Participant[];
@@ -19,14 +19,14 @@ export default function VideoGrid({ participants, remoteStreams, callState }: Vi
         <div className={`absolute inset-0 w-full h-full bg-surface-hover/20 p-4 grid gap-4 ${getGridClass()} auto-rows-fr ${callState === 'proposed' ? 'opacity-0 pointer-events-none' : 'opacity-100'} transition-opacity duration-300`}>
             {participants.length > 0 ? (
                 participants.map((participant) => (
-                    <div key={participant.id} className="relative w-full h-full bg-surface rounded-2xl overflow-hidden flex items-center justify-center border border-border group hover:border-gold/50 transition-colors">
+                    <div key={participant.peerId} className="relative w-full h-full bg-surface rounded-2xl overflow-hidden flex items-center justify-center border border-border group hover:border-gold/50 transition-colors">
                         {/* Remote Video Element */}
                         <RemoteVideo
-                            stream={remoteStreams[participant.id]}
-                            isMuted={participant.isMuted}
-                            isVideoOff={participant.isVideoOff}
+                            stream={remoteStreams[participant.peerId]}
+                            isMuted={false}
+                            isVideoOff={false}
                             avatarUrl={participant.avatarUrl}
-                            displayName={participant.displayName}
+                            displayName={participant.displayName || 'Anonymous'}
                         />
 
                         {/* Reputation Badge */}

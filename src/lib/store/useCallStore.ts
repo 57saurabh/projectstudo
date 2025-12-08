@@ -1,184 +1,105 @@
+// src/lib/store/useCallStore.ts
 import { create } from 'zustand';
 
-export interface Participant {
-    id: string; // Socket ID
-    userId?: string; // DB User ID (ObjectId)
-    displayName: string;
-    isMuted: boolean;
-    isVideoOff: boolean;
-    reputation?: number;
-    avatarUrl?: string;
-    shouldOffer?: boolean;
-    bio?: string;
-    country?: string;
-    language?: string;
+export type CallState = 'idle' | 'searching' | 'proposed' | 'connecting' | 'connected';
+
+export interface ParticipantPublic {
+  peerId: string;
+  userId?: string;
+  displayName?: string;
+  username?: string;
+  avatarUrl?: string;
+  bio?: string;
+  country?: string;
+  language?: string;
+  reputation?: number;
+  profession?: string;
+  interests?: string[];
+  preferences?: any;
 }
 
 export interface ChatMessage {
-    senderId: string;
-    senderName: string;
-    text: string;
-    timestamp: number;
-    isSystem?: boolean;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+  isSystem?: boolean;
 }
 
 export interface PendingInvite {
-    senderId: string;
-    senderName: string;
-    avatarUrl?: string;
+  roomId: string;
+  senderId: string;
+  senderName: string;
+  avatarUrl?: string;
 }
 
-interface CallState {
-    // Media Streams
-    localStream: MediaStream | null;
-    remoteStreams: Record<string, MediaStream>; // userId -> Stream
-
-    // Call Status
-    roomId: string | null;
-    callType: 'random' | 'private' | 'group' | null;
-    callState: 'idle' | 'searching' | 'proposed' | 'connecting' | 'connected';
-    inQueue: boolean;
-    inCall: boolean;
-    isInitiator: boolean;
-
-    pendingInvite: PendingInvite | null;
-
-    // User Status
-    isMuted: boolean;
-    isVideoOff: boolean;
-    isScreenSharing: boolean;
-
-    // Data
-    participants: Participant[];
-    messages: ChatMessage[];
-    mediaError: string | null;
-
-    // Actions
-    setLocalStream: (stream: MediaStream | null) => void;
-    setMediaError: (error: string | null) => void;
-    addRemoteStream: (userId: string, stream: MediaStream) => void;
-    removeRemoteStream: (userId: string) => void;
-
-    setRoomId: (roomId: string | null) => void;
-    setCallType: (type: 'random' | 'private' | 'group' | null) => void;
-    setCallState: (state: 'idle' | 'searching' | 'proposed' | 'connecting' | 'connected') => void;
-    setInQueue: (inQueue: boolean) => void;
-    setInCall: (inCall: boolean) => void;
-    setIsInitiator: (isInitiator: boolean) => void;
-
-    setPendingInvite: (invite: PendingInvite | null) => void;
-
-    toggleMute: () => void;
-    toggleVideo: () => void;
-    setIsScreenSharing: (isScreenSharing: boolean) => void;
-
-    addParticipant: (participant: Participant) => void;
-    removeParticipant: (userId: string) => void;
-    updateParticipant: (userId: string, updates: Partial<Participant>) => void;
-
-    addMessage: (message: ChatMessage) => void;
-    resetCall: (keepLocalStream?: boolean) => void;
+interface Proposal {
+  roomId: string;
+  type: 'incoming' | 'outgoing';
+  candidate: ParticipantPublic; // The other person to show in UI
+  participants: ParticipantPublic[];
+  createdAt: number;
+  keyId?: string; // Explicit ID for voting (The Proposal Owner)
 }
 
-export const useCallStore = create<CallState>((set) => ({
-    localStream: null,
-    remoteStreams: {},
+interface CallStore {
+  callState: CallState;
+  setCallState: (s: CallState) => void;
 
-    roomId: null,
-    callType: null,
-    callState: 'idle',
-    inQueue: false,
-    inCall: false,
-    isInitiator: false,
+  currentRoomId: string | null;
+  setCurrentRoomId: (id: string | null) => void;
 
-    isMuted: false,
-    isVideoOff: false,
-    isScreenSharing: false,
+  localStream: MediaStream | null;
+  setLocalStream: (s: MediaStream | null) => void;
 
-    participants: [],
-    messages: [],
+  participants: ParticipantPublic[];
+  setParticipants: (p: ParticipantPublic[]) => void;
+  addParticipant: (p: ParticipantPublic) => void;
+  removeParticipant: (peerId: string) => void;
 
-    mediaError: null,
+  proposal: Proposal | null;
+  setProposal: (p: Proposal | null) => void;
+  clearProposal: () => void;
 
-    pendingInvite: null,
+  searchingToken?: string | null; // generated token for the current search session (prevents cross-requests)
+  setSearchingToken: (t?: string | null) => void;
 
-    setPendingInvite: (invite) => set({ pendingInvite: invite }),
+  acceptSentMap: Record<string, boolean>; // key: `${roomId}:${candidateId}`
+  markAcceptSent: (key: string) => void;
+  clearAcceptSent: (key?: string) => void;
+}
 
-    setLocalStream: (stream) => set({ localStream: stream }),
-    setMediaError: (error: string | null) => set({ mediaError: error }),
-    addRemoteStream: (userId, stream) => set((state) => ({
-        remoteStreams: { ...state.remoteStreams, [userId]: stream }
-    })),
-    removeRemoteStream: (userId) => set((state) => {
-        const newStreams = { ...state.remoteStreams };
-        delete newStreams[userId];
-        return { remoteStreams: newStreams };
+export const useCallStore = create<CallStore>()((set, get) => ({
+  callState: 'idle',
+  setCallState: (s) => set({ callState: s }),
+
+  currentRoomId: null,
+  setCurrentRoomId: (id) => set({ currentRoomId: id }),
+
+  localStream: null,
+  setLocalStream: (s) => set({ localStream: s }),
+
+  participants: [],
+  setParticipants: (p) => set({ participants: p }),
+  addParticipant: (p) =>
+    set((st) => ({ participants: [...st.participants.filter((x) => x.peerId !== p.peerId), p] })),
+  removeParticipant: (peerId) =>
+    set((st) => ({ participants: st.participants.filter((x) => x.peerId !== peerId) })),
+
+  proposal: null,
+  setProposal: (p) => set({ proposal: p }),
+  clearProposal: () => set({ proposal: null }),
+
+  searchingToken: null,
+  setSearchingToken: (t) => set({ searchingToken: t }),
+
+  acceptSentMap: {},
+  markAcceptSent: (key) => set((s) => ({ acceptSentMap: { ...s.acceptSentMap, [key]: true } })),
+  clearAcceptSent: (key) =>
+    set((s) => {
+      if (!key) return { acceptSentMap: {} };
+      const next = { ...s.acceptSentMap };
+      delete next[key];
+      return { acceptSentMap: next };
     }),
-
-    setRoomId: (roomId) => set({ roomId }),
-    setCallType: (callType) => set({ callType }),
-    setCallState: (callState) => set({ callState }),
-    setInQueue: (inQueue) => set({ inQueue }),
-    setInCall: (inCall) => set({ inCall }),
-    setIsInitiator: (isInitiator) => set({ isInitiator }),
-
-    toggleMute: () => set((state) => {
-        if (state.localStream) {
-            const tracks = state.localStream.getAudioTracks();
-            console.log('[useCallStore] Toggling mute. Current isMuted:', state.isMuted, 'Audio Tracks:', tracks.length);
-            tracks.forEach(track => {
-                track.enabled = state.isMuted; // If isMuted=true (currently muted), set enabled=true (unmute).
-                console.log('[useCallStore] Track', track.id, 'enabled set to:', track.enabled);
-            });
-        } else {
-            console.warn('[useCallStore] No local stream found when toggling mute');
-        }
-        return { isMuted: !state.isMuted };
-    }),
-    toggleVideo: () => set((state) => {
-        if (state.localStream) {
-            const tracks = state.localStream.getVideoTracks();
-            console.log('[useCallStore] Toggling video. Current isVideoOff:', state.isVideoOff, 'Video Tracks:', tracks.length);
-            tracks.forEach(track => {
-                track.enabled = state.isVideoOff; // If isVideoOff=true (currently off), set enabled=true (on).
-                console.log('[useCallStore] Track', track.id, 'enabled set to:', track.enabled);
-            });
-        } else {
-            console.warn('[useCallStore] No local stream found when toggling video');
-        }
-        return { isVideoOff: !state.isVideoOff };
-    }),
-    setIsScreenSharing: (isScreenSharing) => set({ isScreenSharing }),
-
-    addParticipant: (participant) => set((state) => ({
-        participants: [...state.participants.filter(p => p.id !== participant.id), participant]
-    })),
-    removeParticipant: (userId) => set((state) => ({
-        participants: state.participants.filter(p => p.id !== userId)
-    })),
-    updateParticipant: (userId, updates) => set((state) => ({
-        participants: state.participants.map(p => p.id === userId ? { ...p, ...updates } : p)
-    })),
-
-    addMessage: (message) => set((state) => ({
-        messages: [...state.messages, message]
-    })),
-
-    resetCall: (keepLocalStream = false) => set((state) => ({
-        localStream: keepLocalStream ? state.localStream : null,
-        mediaError: null,
-        remoteStreams: {},
-        roomId: null,
-        callType: null,
-        callState: 'idle',
-        inQueue: false,
-        inCall: false,
-        isInitiator: false,
-        participants: [],
-        messages: [],
-        isMuted: false,
-        isVideoOff: false,
-        isScreenSharing: false,
-        pendingInvite: null
-    }))
 }));

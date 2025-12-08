@@ -27,20 +27,15 @@ interface SignalingContextType {
 const SignalingContext = createContext<SignalingContextType | null>(null);
 
 export const SignalingProvider = ({ children }: { children: React.ReactNode }) => {
-    const socketRef = useRef<Socket | null>(null);
+    // Use state to trigger re-renders when socket is created
+    const [socket, setSocket] = React.useState<Socket | null>(null);
+    const socketRef = useRef<Socket | null>(null); // Keep ref for internal robust access in callbacks
     const { user, token } = useSelector((state: RootState) => state.auth);
     const {
-        setRoomId,
         addParticipant,
         removeParticipant,
-        updateParticipant,
-        addMessage,
-        setInQueue,
-        setInCall,
         setCallState,
-        setIsInitiator,
-        resetCall,
-        setPendingInvite
+        // setProposal and clearProposal will be accessed via getState to avoid deps
     } = useCallStore();
 
     const [unreadCount, setUnreadCount] = React.useState(0);
@@ -60,15 +55,21 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
     const markAsRead = useCallback((senderId: string) => {
         if (!socketRef.current) return;
         socketRef.current.emit('mark-read', { senderId });
-        // Refresh count after a short delay to allow DB update
         setTimeout(fetchUnreadCount, 500);
     }, [fetchUnreadCount]);
 
+    const resetCall = useCallback(() => {
+        const store = useCallStore.getState();
+        store.setCallState('idle');
+        store.setParticipants([]);
+        store.clearProposal();
+        store.setCurrentRoomId(null);
+    }, []);
+
     const findMatch = useCallback(() => {
-        setInQueue(true);
         setCallState('searching');
         socketRef.current?.emit('find-match');
-    }, [setInQueue, setCallState]);
+    }, [setCallState]);
 
     const acceptMatch = useCallback((targetId: string) => {
         if (!socketRef.current) return;
@@ -86,24 +87,16 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
         if (!socketRef.current) return;
         console.log('Accepting invite from:', senderId);
         socketRef.current.emit('accept-invite', { senderId });
-        setPendingInvite(null);
-    }, [setPendingInvite]);
+    }, []);
 
     const rejectInvite = useCallback(() => {
-        setPendingInvite(null);
-    }, [setPendingInvite]);
+        // no-op
+    }, []);
 
     const sendMessage = useCallback((targetId: string, text: string) => {
         if (!socketRef.current || !user) return;
-
         socketRef.current.emit('chat-message', { target: targetId, message: text });
-        addMessage({
-            senderId: user._id,
-            senderName: user.displayName || 'Me',
-            text,
-            timestamp: Date.now()
-        });
-    }, [user, addMessage]);
+    }, [user]);
 
     const skipMatch = useCallback((targetId?: string) => {
         if (targetId) {
@@ -124,15 +117,22 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
     useEffect(() => {
         if (!user) return;
 
-        // If socket already exists and is connected with same user, skip
+        // If we already have a socket connected with the SAME userId, don't reconnect
         if (socketRef.current?.connected) {
-            // We might want to check if the user ID matches, but for now assume if user changes, this effect re-runs
+            const currentQuery = (socketRef.current as any).query; // simplistic check, or just force reconnect
+            // safer to force reconnect if user changes
+            // console.log('Socket already connected');
         }
 
-        // Initialize Socket
+        if (socketRef.current) {
+            socketRef.current.disconnect();
+        }
+
+        const userId = user.id || (user as any)._id;
+
         socketRef.current = io(SOCKET_URL, {
             query: {
-                userId: user._id,
+                userId: userId,
                 displayName: user.displayName,
                 username: user.username
             },
@@ -142,6 +142,9 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
             reconnectionDelay: 1000
         });
 
+        // Set state to trigger re-render
+        setSocket(socketRef.current);
+
         const socket = socketRef.current;
 
         socket.on('connect', () => {
@@ -149,121 +152,136 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
         });
 
         // Matchmaking Events
-        socket.on('match-proposed', ({ peerId, peerUserId, initiator, reputation, avatarUrl, username, bio, country, language }) => {
-            console.log('Match proposed:', peerId);
-            setCallState('proposed');
-            setInQueue(false);
+        // Matchmaking Events (New Flow)
+        socket.on('proposal-received', (data: any) => {
+            console.log('Proposal received:', data);
 
-            addParticipant({
-                id: peerId,
-                userId: peerUserId,
-                displayName: username || 'Stranger',
-                isMuted: false,
-                isVideoOff: false,
-                reputation,
-                avatarUrl,
-                shouldOffer: false,
-                bio,
-                country,
-                language
+            // Map backend payload to store Proposal type
+            // Incoming: { type: 'incoming', user: candidate, roomId }
+            // Outgoing: { type: 'outgoing', users: participants, roomId }
+            useCallStore.getState().setProposal({
+                roomId: data.roomId,
+                type: data.type,
+                candidate: data.user || data.users?.[0],      // mapped from 'user', fallback to first participant
+                participants: data.users,  // mapped from 'users'
+                createdAt: Date.now(),
+                keyId: data.candidateId // Map explicit key owner
             });
+
+            // If we are "searching", we might want to switch state to "proposed" or "voting"?
+            // The UI (MatchOverlay) handles display based on 'proposal' existence or callState.
+            // Let's set callState to 'voting' or keep 'searching' but show modal?
+            // Page.tsx logic suggests: callState='voting' logic was there?
+            // Store has 'proposed' state.
+            setCallState('proposed');
         });
 
-        socket.on('start-call', ({ peerId, shouldOffer }) => {
-            console.log('Starting call with:', peerId, 'Should offer:', shouldOffer);
-            setCallState('connecting');
-            setInCall(true);
-            setIsInitiator(shouldOffer);
-            updateParticipant(peerId, { shouldOffer });
-        });
+        socket.on('recommendation-ended', (data: { reason: string, roomId?: string }) => {
+            console.log('Recommendation ended:', data);
 
-        socket.on('match-cancelled', () => {
-            console.log('Match cancelled by peer');
-            resetCall(true);
-            findMatch();
-        });
+            if (data.reason === 'accepted') {
+                // Determine peer(s) from proposal to add to participants
+                const proposal = useCallStore.getState().proposal;
+                const { addParticipant } = useCallStore.getState();
 
-        // Invite Events
-        socket.on('invite-received', (data) => {
-            console.log('Invite received:', data);
-            setPendingInvite(data);
+                if (proposal) {
+                    if (proposal.candidate) {
+                        const candidate = proposal.candidate as any;
+                        addParticipant({
+                            peerId: candidate.peerId || candidate.id || 'unknown',
+                            userId: candidate.userId || candidate.id,
+                            displayName: candidate.displayName,
+                            username: candidate.username,
+                            avatarUrl: candidate.avatarUrl,
+                            bio: candidate.bio,
+                            country: candidate.country,
+                            language: candidate.language,
+                            reputation: candidate.reputation,
+                            profession: candidate.profession,
+                            interests: candidate.interests,
+                            preferences: candidate.preferences
+                        });
+                    }
+                    if (proposal.participants && proposal.participants.length > 0) {
+                        proposal.participants.forEach(pRaw => {
+                            const p = pRaw as any;
+                            addParticipant({
+                                peerId: p.peerId || p.id || 'unknown',
+                                userId: p.userId || p.id,
+                                displayName: p.displayName,
+                                username: p.username,
+                                avatarUrl: p.avatarUrl,
+                                bio: p.bio,
+                                country: p.country,
+                                language: p.language,
+                                reputation: p.reputation,
+                                profession: p.profession,
+                                interests: p.interests,
+                                preferences: p.preferences
+                            });
+                        });
+                    }
+                }
+
+                // Transition to 'connected' (implicitly starting video setup via useWebRTC)
+                // Note: We do NOT clear proposal here immediately, so useWebRTC can read it if needed.
+                // It will be cleared later or by resetCall.
+                setCallState('connected');
+            } else {
+                useCallStore.getState().clearProposal();
+                setCallState('searching');
+            }
         });
 
         socket.on('user-joined', (data) => {
             console.log('User joined:', data);
             addParticipant({
-                id: data.peerId,
+                peerId: data.peerId || data.id,
+                userId: data.userId || data.id,
                 displayName: data.displayName,
-                isMuted: false,
-                isVideoOff: false,
+                username: data.username,
+                avatarUrl: data.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.peerId}`,
+                bio: data.bio,
+                country: data.country,
+                language: data.language,
                 reputation: data.reputation,
-                avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.peerId}`,
-                shouldOffer: true
+                profession: data.profession,
+                interests: data.interests,
+                preferences: data.preferences
             });
-            addMessage({
-                senderId: 'system',
-                senderName: 'System',
-                text: `${data.displayName} joined the call.`,
-                timestamp: Date.now(),
-                isSystem: true
-            });
+            // Implicitly connected
+            setCallState('connected');
         });
 
+        // Leftover legacy joining just in case, but 'user-joined' is main one now
         socket.on('join-success', (data) => {
-            console.log('Joined call successfully:', data);
-            setCallState('connected');
-            setInCall(true);
-
-            data.peers.forEach((peer: any) => {
-                addParticipant({
-                    id: peer.id,
-                    displayName: peer.displayName,
-                    isMuted: false,
-                    isVideoOff: false,
-                    reputation: peer.reputation,
-                    avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${peer.id}`,
-                    shouldOffer: false
-                });
-            });
+            // ...
         });
 
         // Chat Events
         socket.on('chat-message', ({ senderId, text, senderName }) => {
-            addMessage({
-                senderId,
-                senderName,
-                text,
-                timestamp: Date.now()
-            });
-
-            // Increment unread count if we are not in the messages page or chatting with this user
+            // Unread logic
             setUnreadCount(prev => prev + 1);
         });
 
         // Call Events
         socket.on('peer-left', ({ peerId }) => {
             removeParticipant(peerId);
-            addMessage({
-                senderId: 'system',
-                senderName: 'System',
-                text: 'Peer has left the chat.',
-                timestamp: Date.now(),
-                isSystem: true
-            });
         });
 
         socket.on('force-disconnect', () => {
             console.log('Received force-disconnect. Resetting call and searching...');
-            resetCall(true);
+            resetCall();
             setTimeout(() => {
                 findMatch();
             }, 1000);
         });
 
         return () => {
-            socket.disconnect();
+            if (socketRef.current) socketRef.current.disconnect();
+            setSocket(null);
         };
-    }, [user, findMatch, resetCall, setCallState, setInQueue, addParticipant, setInCall, setIsInitiator, updateParticipant, setPendingInvite, addMessage]);
+    }, [(user as any)?._id || user?.id, user?.username, user?.displayName, findMatch, resetCall, setCallState, addParticipant, removeParticipant]);
 
     // Fetch initial unread count
     useEffect(() => {
@@ -272,7 +290,7 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
 
     return (
         <SignalingContext.Provider value={{
-            socket: socketRef.current,
+            socket: socket,
             findMatch,
             acceptMatch,
             inviteUser,
@@ -297,3 +315,5 @@ export const useSignalingContext = () => {
     }
     return context;
 };
+
+export const useSignaling = useSignalingContext;
