@@ -24,8 +24,20 @@ import RecommendationsView from '@/components/call/random/RecommendationsView';
 export default function RandomChatPage() {
     const { user, token } = useSelector((state: RootState) => state.auth);
 
+    const { messages, chatId, isFriend, remoteIsTyping } = useCallStore();
+
     // 1. Signaling
-    const { socket, sendMessage, acceptMatch, skipMatch } = useSignaling();
+    const {
+        findMatch,
+        acceptMatch,
+        skipMatch,
+        socket,
+        inviteUser,
+        sendMessage,
+        addRandomUser,
+        acceptInvite,
+        sendTyping
+    } = useSignaling();
 
     // 2. Call Store (Global State)
     const {
@@ -35,7 +47,7 @@ export default function RandomChatPage() {
         setParticipants,
         proposal,
         remoteScreenShares,
-        localScreenStream
+        localScreenStream,
     } = useCallStore();
 
     // 3. WebRTC (Media & Peers)
@@ -210,6 +222,23 @@ export default function RandomChatPage() {
         return () => clearInterval(interval);
     }, [localStream, callState, abortCall]);
 
+    // -- Friendship Timer --
+    useEffect(() => {
+        if (!socket || callState !== 'connected' || !chatId) return;
+
+        const timer = setTimeout(() => {
+            console.log('[RandomChat] 90s passed. Checking for friendship...');
+            socket.emit('check-friendship');
+        }, 90000); // 90 seconds
+
+        return () => clearTimeout(timer);
+    }, [socket, callState, chatId]);
+
+    const onSendMessage = (e?: React.FormEvent) => {
+        e?.preventDefault();
+        sendMessage(participants[0]?.peerId, inputMessage);
+        setInputMessage('');
+    };
 
     return (
         <div className="relative flex h-full w-full flex-col bg-background font-sans overflow-hidden text-text-primary">
@@ -302,12 +331,16 @@ export default function RandomChatPage() {
 
                 <ChatArea
                     showChat={showChat}
-                    messages={[]}
+                    messages={messages}
                     user={user}
                     inputMessage={inputMessage}
                     setInputMessage={setInputMessage}
-                    onSendMessage={(e) => { e?.preventDefault(); sendMessage(participants[0]?.peerId, inputMessage); setInputMessage(''); }}
+                    onSendMessage={onSendMessage}
                     currentPeerId={participants[0]?.peerId}
+                    chatId={chatId}
+                    isFriend={isFriend}
+                    remoteIsTyping={remoteIsTyping}
+                    sendTyping={sendTyping}
                 />
             </main>
         </div>

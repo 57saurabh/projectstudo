@@ -1,11 +1,12 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useRef, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useCallStore } from '../store/useCallStore';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
 import axios from 'axios';
+import { toast } from 'sonner';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:4000';
 
@@ -22,13 +23,14 @@ interface SignalingContextType {
     getOnlineUsers: () => void;
     unreadCount: number;
     markAsRead: (senderId: string) => void;
+    sendTyping: (isTyping: boolean) => void;
 }
 
 const SignalingContext = createContext<SignalingContextType | null>(null);
 
 export const SignalingProvider = ({ children }: { children: React.ReactNode }) => {
     // Use state to trigger re-renders when socket is created
-    const [socket, setSocket] = React.useState<Socket | null>(null);
+    const [socket, setSocket] = useState<Socket | null>(null);
     const socketRef = useRef<Socket | null>(null); // Keep ref for internal robust access in callbacks
     const { user, token } = useSelector((state: RootState) => state.auth);
     const {
@@ -65,6 +67,9 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
         store.setParticipants([]);
         store.clearProposal();
         store.setCurrentRoomId(null);
+        store.setChatId(null);
+        store.setMessages([]);
+        store.setIsFriend(false);
     }, []);
 
     const findMatch = useCallback(() => {
@@ -106,12 +111,66 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
     }, []);
 
     const sendMessage = useCallback((targetId: string, text: string) => {
-        if (!socketRef.current || !user) return;
-        socketRef.current.emit('chat-message', { target: targetId, message: text });
+        if (!socketRef.current || !user) {
+            console.error('[SignalingContext] Cannot send message: No socket or user');
+            return;
+        }
+        const { chatId } = useCallStore.getState();
+        console.log('[SignalingContext] sending message:', { targetId, text, chatId });
+
+        // If we have a chatId, we send it. Otherwise legacy targetId behavior (optional)
+        // But for random chat, we rely on chatId primarily now.
+        socketRef.current.emit('chat-message', { chatId, text, receiverId: targetId });
+
+        // Optimistic Update
+        useCallStore.getState().addMessage({
+            senderId: user.id || (user as any)._id,
+            senderName: user.displayName || user.username || 'Me',
+            text,
+            timestamp: Date.now(), // or string
+            chatId: chatId || undefined
+        });
     }, [user]);
 
     const getOnlineUsers = useCallback(() => {
         socketRef.current?.emit('get-online-users');
+    }, []);
+
+    const [isTyping, setIsTyping] = useState<boolean>(false);
+    const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Typing Event Handlers (New)
+    useEffect(() => {
+        if (!socketRef.current) return;
+
+        const handleTyping = (data: { senderId: string, isTyping: boolean }) => {
+            console.log('[SignalingContext] Typing update:', data);
+            // Only show if it's the current chat
+            const { chatId, participants } = useCallStore.getState();
+            // Assuming 1v1 for now or check senderId
+            // Better: active participant check
+            if (data.senderId !== user?.id) {
+                // We can't easily map senderId to Store UI without a "typingUsers" map.
+                // For now, simplify: if any peer types, set global isTyping to true for the UI.
+                // Or update store. 
+                // But wait, user wanted "other should see typing animation".
+                // Let's add `remoteIsTyping` to Store.
+                useCallStore.getState().setRemoteIsTyping(data.isTyping);
+            }
+        };
+
+        socketRef.current.on('typing-update', handleTyping);
+        return () => {
+            socketRef.current?.off('typing-update', handleTyping);
+        };
+    }, [user]);
+
+    const sendTyping = useCallback((isTyping: boolean) => {
+        if (!socketRef.current) return;
+        const { chatId } = useCallStore.getState();
+        if (chatId) {
+            socketRef.current.emit('typing', { chatId, isTyping });
+        }
     }, []);
 
     const skipMatch = useCallback((targetId?: string) => {
@@ -191,61 +250,48 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
             console.log('Recommendation ended:', data);
 
             if (data.reason === 'accepted') {
-                // Determine peer(s) from proposal to add to participants
-                const proposal = useCallStore.getState().proposal;
-                const { addParticipant } = useCallStore.getState();
-
-                if (proposal) {
-                    if (proposal.candidate) {
-                        const candidate = proposal.candidate as any;
-                        addParticipant({
-                            peerId: candidate.peerId || candidate.id || 'unknown',
-                            userId: candidate.userId || candidate.id,
-                            displayName: candidate.displayName,
-                            username: candidate.username,
-                            avatarUrl: candidate.avatarUrl,
-                            bio: candidate.bio,
-                            country: candidate.country,
-                            language: candidate.language,
-                            reputation: candidate.reputation,
-                            profession: candidate.profession,
-                            interests: candidate.interests,
-                            preferences: candidate.preferences
-                        });
-                    }
-                    if (proposal.participants && proposal.participants.length > 0) {
-                        proposal.participants.forEach(pRaw => {
-                            const p = pRaw as any;
-                            // Filter out self
-                            const pId = p.peerId || p.id || 'unknown';
-                            if (socket?.id && pId === socket.id) return;
-
-                            addParticipant({
-                                peerId: pId,
-                                userId: p.userId || p.id,
-                                displayName: p.displayName,
-                                username: p.username,
-                                avatarUrl: p.avatarUrl,
-                                bio: p.bio,
-                                country: p.country,
-                                language: p.language,
-                                reputation: p.reputation,
-                                profession: p.profession,
-                                interests: p.interests,
-                                preferences: p.preferences
-                            });
-                        });
-                    }
-                }
-
-                // Transition to 'connected' (implicitly starting video setup via useWebRTC)
-                // Note: We do NOT clear proposal here immediately, so useWebRTC can read it if needed.
-                // It will be cleared later or by resetCall.
+                // Transition to 'connected' is handled in room-created mostly, but this confirms voting done.
+                // We do NOT set connected here if room-created handles it, but room-created might come first or later.
+                // existing logic sets connected here.
                 setCallState('connected');
             } else {
                 useCallStore.getState().clearProposal();
                 setCallState('searching');
             }
+        });
+
+        // Room Created handling (Updated)
+        socket.on('room-created', (data: { roomId: string, peers: any[], chatId?: string }) => {
+            console.log('[Signaling] room-created', data);
+
+            // Set Store Data
+            const store = useCallStore.getState();
+            store.setCurrentRoomId(data.roomId);
+            store.setChatId(data.chatId || null);
+            store.setMessages([]);
+            store.setIsFriend(false);
+
+            // Add Peers
+            data.peers.forEach((user) => {
+                const remoteId = user.peerId || user.id;
+                if (!remoteId || (socket?.id && socket.id === remoteId)) return;
+                addParticipant({
+                    peerId: remoteId,
+                    userId: user.userId || user.id,
+                    displayName: user.displayName,
+                    username: user.username,
+                    avatarUrl: user.avatarUrl,
+                    bio: user.bio,
+                    country: user.country,
+                });
+            });
+
+            setCallState('connected');
+        });
+
+        socket.on('friendship-created', (data) => {
+            toast.success("You are now friends! Chat unlocked forever.");
+            useCallStore.getState().setIsFriend(true);
         });
 
         socket.on('user-joined', (data) => {
@@ -274,9 +320,24 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
         });
 
         // Chat Events
-        socket.on('chat-message', ({ senderId, text, senderName }) => {
-            // Unread logic
-            setUnreadCount(prev => prev + 1);
+        socket.on('chat-message', (data: { senderId: string, text: string, chatId?: string, timestamp: any }) => {
+            console.log('[Signaling] Chat Message', data);
+
+            // Check if it belongs to current chat
+            const currentChatId = useCallStore.getState().chatId;
+            if (data.chatId && data.chatId !== currentChatId) {
+                // Background notification or unread count
+                setUnreadCount(prev => prev + 1);
+                return;
+            }
+
+            useCallStore.getState().addMessage({
+                senderId: data.senderId,
+                senderName: 'Partner', // We might need to look up name from participants list
+                text: data.text,
+                timestamp: data.timestamp || Date.now(),
+                chatId: data.chatId
+            });
         });
 
         // Call Events
@@ -337,7 +398,8 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
             addRandomUser,
             getOnlineUsers,
             unreadCount,
-            markAsRead
+            markAsRead,
+            sendTyping
         }}>
             {children}
         </SignalingContext.Provider>

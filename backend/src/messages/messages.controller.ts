@@ -15,6 +15,7 @@ export class MessagesController {
 
     private initializeRoutes() {
         this.router.get('/', this.getConversations);
+        this.router.get('/unread', this.getUnreadCount);
         this.router.get('/:userId', this.getMessages);
     }
 
@@ -59,6 +60,21 @@ export class MessagesController {
             res.json(data);
         } catch (error: any) {
             console.error('Error fetching messages:', error);
+            res.status(500).json({ message: error.message });
+        }
+    };
+
+    private getUnreadCount = async (req: express.Request, res: express.Response) => {
+        try {
+            const userId = this.getUserIdFromToken(req);
+            if (!userId) {
+                return res.status(401).json({ message: 'Unauthorized' });
+            }
+
+            const data = await this.messagesService.getUnreadCount(userId);
+            res.json(data);
+        } catch (error: any) {
+            console.error('Error fetching unread count:', error);
             res.status(500).json({ message: error.message });
         }
     };

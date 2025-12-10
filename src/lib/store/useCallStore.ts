@@ -19,10 +19,11 @@ export interface ParticipantPublic {
 }
 
 export interface ChatMessage {
+  chatId?: string;
   senderId: string;
   senderName: string;
   text: string;
-  timestamp: number;
+  timestamp: Date | string | number; // flexible
   isSystem?: boolean;
 }
 
@@ -74,6 +75,20 @@ interface CallStore {
   acceptSentMap: Record<string, boolean>; // key: `${roomId}:${candidateId}`
   markAcceptSent: (key: string) => void;
   clearAcceptSent: (key?: string) => void;
+
+  // Chat & Friendship
+  chatId: string | null;
+  setChatId: (id: string | null) => void;
+
+  messages: ChatMessage[];
+  setMessages: (m: ChatMessage[]) => void;
+  addMessage: (m: ChatMessage) => void;
+
+  isFriend: boolean;
+  setIsFriend: (b: boolean) => void;
+
+  remoteIsTyping: boolean;
+  setRemoteIsTyping: (isTyping: boolean) => void;
 }
 
 export const useCallStore = create<CallStore>()((set, get) => ({
@@ -121,4 +136,17 @@ export const useCallStore = create<CallStore>()((set, get) => ({
       delete next[key];
       return { acceptSentMap: next };
     }),
+
+  chatId: null,
+  setChatId: (id) => set({ chatId: id }),
+
+  messages: [],
+  setMessages: (messages) => set({ messages }),
+  addMessage: (msg) => set((state) => ({ messages: [...state.messages, msg] })),
+
+  isFriend: false,
+  setIsFriend: (is) => set({ isFriend: is }),
+
+  remoteIsTyping: false,
+  setRemoteIsTyping: (isTyping) => set({ remoteIsTyping: isTyping }),
 }));

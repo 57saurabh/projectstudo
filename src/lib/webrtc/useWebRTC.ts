@@ -225,7 +225,7 @@ export function useWebRTC(localVideoRef: React.RefObject<HTMLVideoElement | null
 
       // COLLISION HANDLING
       const isPolite = (socket.id || '') > sender;
-      const readyForOffer = pc.signalingState === 'stable' || pc.signalingState === 'have-remote-offer';
+      const readyForOffer = !pc.signalingState || pc.signalingState === 'stable' || pc.signalingState === 'have-remote-offer';
       const offerCollision = (sdp.type === 'offer') && !readyForOffer;
 
       ignoreOfferRef.current = ignoreOfferRef.current || {};

@@ -6,6 +6,10 @@ import { RoomService } from '../services/room.service';
 import { UserModel } from '../models/User';
 import { ModerationService } from '../microservices/moderation/moderationService';
 import { MatchProposal } from '../models/MatchProposal';
+import { ChatModel } from '../models/Chat';
+import { MessageModel } from '../models/Message';
+import { FriendshipModel } from '../models/Friendship';
+import { ActiveRoom } from '../models/ActiveRoom';
 
 /**
  * SocketGateway (Online-Only, Intent-Based, MongoDB)
@@ -59,6 +63,11 @@ export class SocketGateway {
       // Actions
       socket.on('leave-room', () => this.handleLeaveRoom(socket));
       socket.on('disconnect', () => this.handleDisconnect(socket));
+
+      // CHAT & FRIENDSHIP
+      socket.on('chat-message', (d) => this.handleChatMessage(socket, d));
+      socket.on('typing', (d) => this.handleTyping(socket, d));
+      socket.on('check-friendship', () => this.handleAutoFriendship(socket));
     });
   }
 
@@ -268,11 +277,25 @@ export class SocketGateway {
         await MatchProposal.deleteOne({ proposalId });
         await this.roomService.createRoom(roomId, proposal.participants);
 
+        // 🎯 1. CREATE NEW CHAT SESSION
+        const participantUserIds = proposal.participants
+          .map(sid => this.socketToUserId.get(sid))
+          .filter(Boolean) as string[];
+
+        let chatId = null;
+        if (participantUserIds.length === 2) {
+          const newChat = await ChatModel.create({
+            participants: participantUserIds
+          });
+          chatId = newChat._id;
+        }
+
         const peers = await Promise.all(proposal.participants.map(id => this._publicUser(id)));
 
         proposal.participants.forEach((pid) => {
           const otherPeers = peers.filter(p => p.peerId !== pid);
-          this.io.to(pid).emit('room-created', { roomId, peers: otherPeers });
+          // Send chatID to client
+          this.io.to(pid).emit('room-created', { roomId, peers: otherPeers, chatId });
           this.io.to(pid).emit('recommendation-ended', { reason: 'accepted' });
         });
       }
@@ -322,5 +345,149 @@ export class SocketGateway {
       username: dbUser?.username || `User-${socketId.slice(0, 4)}`,
       avatarUrl: dbUser?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${socketId}`,
     };
+  }
+
+  // 🎯 8. HANDLE CHAT MESSAGES
+  private async handleChatMessage(socket: Socket, data: { chatId: string, text: string, receiverId?: string }) {
+    console.log(`[SocketGateway] handleChatMessage from ${socket.id}`, data);
+    const senderUid = this.socketToUserId.get(socket.id);
+    if (!senderUid) {
+      console.warn(`[SocketGateway] User not authenticated for socket ${socket.id}`);
+      return;
+    }
+
+    // data.receiverId comes from frontend's "peerId" which is the socketId.
+    let targetSocketId = data.receiverId;
+    let receiverUserId: string | undefined;
+
+    console.log(`[SocketGateway] Raw receiverId: ${data.receiverId}, SenderUID: ${senderUid}`);
+
+    // Fetch Sender Details for UI
+    const sender = await this._publicUser(socket.id);
+    const senderName = sender?.username || 'Unknown';
+
+    // 1. Try Direct Emit if targetSocketId is provided
+    if (targetSocketId) {
+      // Emit to the socket directly
+      console.log(`[SocketGateway] Emitting direct message to socket: ${targetSocketId}`);
+      this.io.to(targetSocketId).emit('chat-message', {
+        senderId: senderUid,
+        senderName,
+        text: data.text,
+        chatId: data.chatId,
+        timestamp: new Date()
+      });
+
+      // Resolve userId for DB
+      receiverUserId = this.socketToUserId.get(targetSocketId);
+      console.log(`[SocketGateway] Resolved receiverUserId from socket: ${receiverUserId}`);
+    }
+
+    // 2. Fallback: User not provided or not found? Try inferred from Room
+    // (Only if direct emit didn't happen or we want to be safe)
+    if (!targetSocketId) {
+      const roomId = await this.roomService.getRoomId(socket.id);
+      console.log(`[SocketGateway] No receiverId. Fallback to room: ${roomId}`);
+      if (roomId) {
+        const participants = await this.roomService.getRoomParticipants(roomId);
+        const otherPeer = participants.find(p => p !== socket.id);
+        if (otherPeer) {
+          targetSocketId = otherPeer; // Found
+          console.log(`[SocketGateway] Found likely peer in room: ${otherPeer}`);
+          this.io.to(otherPeer).emit('chat-message', {
+            senderId: senderUid,
+            senderName,
+            text: data.text,
+            chatId: data.chatId,
+            timestamp: new Date()
+          });
+          receiverUserId = this.socketToUserId.get(otherPeer);
+        } else {
+          console.warn(`[SocketGateway] No other peer found in room ${roomId}`);
+        }
+      } else {
+        console.warn(`[SocketGateway] Socket ${socket.id} is not in any room`);
+      }
+    }
+
+    // 3. Save to DB (Persistent History)
+    // We need both User IDs.
+    if (senderUid && receiverUserId) {
+      await MessageModel.create({
+        chatId: data.chatId,
+        senderId: senderUid,
+        receiverId: receiverUserId,
+        text: data.text,
+        timestamp: new Date()
+      });
+    }
+  }
+
+  // 🎯 2. AUTO-FRIENDSHIP HANDLER
+  private async handleAutoFriendship(socket: Socket) {
+    const roomId = await this.roomService.getRoomId(socket.id);
+    if (!roomId) return;
+
+    const room = await ActiveRoom.findOne({ roomId });
+    if (!room) return;
+
+    // Check Duration
+    const duration = Date.now() - room.createdAt.getTime();
+    if (duration > 90000) { // 90 seconds
+      const participants = room.participants;
+      if (participants.length < 2) return;
+
+      const uids = participants.map(p => this.socketToUserId.get(p)).filter(Boolean) as string[];
+      if (uids.length < 2) return;
+
+      const [userA, userB] = uids;
+
+      // Create Bidirectional Friendship (Two docs or check existing)
+      // Using "findOneAndUpdate" with upsert to avoid duplicates
+      await FriendshipModel.findOneAndUpdate(
+        { userId: userA, friendId: userB },
+        { userId: userA, friendId: userB },
+        { upsert: true, new: true }
+      );
+      await FriendshipModel.findOneAndUpdate(
+        { userId: userB, friendId: userA },
+        { userId: userB, friendId: userA },
+        { upsert: true, new: true }
+      );
+
+      // Sync legacy User.friends array
+      await UserModel.updateOne({ _id: userA }, { $addToSet: { friends: userB } });
+      await UserModel.updateOne({ _id: userB }, { $addToSet: { friends: userA } });
+
+      // Notify Users
+      participants.forEach(pid => {
+        this.io.to(pid).emit('friendship-created', {
+          friendId: pid === participants[0] ? uids[1] : uids[0]
+        });
+      });
+      console.log(`[SocketGateway] Auto-Friendship created for ${userA} & ${userB}`);
+    }
+  }
+
+  // 🎯 9. TYPING INDICATOR
+  private async handleTyping(socket: Socket, data: { chatId: string, isTyping: boolean }) {
+    const senderUid = this.socketToUserId.get(socket.id);
+    if (!senderUid) return;
+
+    const roomId = await this.roomService.getRoomId(socket.id);
+
+    // If we have a roomId (Live Call), broadcast to others in room
+    if (roomId) {
+      const participants = await this.roomService.getRoomParticipants(roomId);
+      const others = participants.filter(p => p !== socket.id);
+      others.forEach(pid => {
+        this.io.to(pid).emit('typing-update', {
+          senderId: senderUid,
+          isTyping: data.isTyping
+        });
+      });
+    }
+    // TODO: Handle Post-Call Chat Typing (using ChatId -> Participants)
+    // This is less critical for "Random Chat" live phase but good for "Friends" phase.
   }
 }

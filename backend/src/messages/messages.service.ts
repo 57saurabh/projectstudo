@@ -1,96 +1,96 @@
-import { ConversationModel as Conversation } from '../models/Conversation';
+import { MessageModel } from '../models/Message';
 import { UserModel } from '../models/User';
+import { FriendshipModel } from '../models/Friendship';
 import { FriendRequestModel } from '../models/FriendRequest';
 
 export class MessagesService {
     async getConversations(userId: string) {
-        const conversations = await Conversation.find({
-            "participants.userId": userId,
-        }).sort({ updatedAt: -1 });
+        // Aggregate messages to find unique conversations (Users)
+        const conversations = await MessageModel.aggregate([
+            { $match: { $or: [{ senderId: userId }, { receiverId: userId }] } },
+            { $sort: { timestamp: -1 } },
+            {
+                $group: {
+                    _id: { $cond: [{ $eq: ["$senderId", userId] }, "$receiverId", "$senderId"] },
+                    lastMessage: { $first: "$$ROOT" },
+                    unreadCount: {
+                        $sum: {
+                            $cond: [
+                                { $and: [{ $eq: ["$receiverId", userId] }, { $eq: ["$isRead", false] }] },
+                                1,
+                                0
+                            ]
+                        }
+                    }
+                }
+            },
+            { $sort: { "lastMessage.timestamp": -1 } }
+        ]);
 
-        const formattedConversations = await Promise.all(
-            conversations.map(async (conv: any) => {
-                const otherParticipant = conv.participants.find(
-                    (p: any) => p.userId !== userId
-                );
+        const formatted = await Promise.all(conversations.map(async (conv) => {
+            const partnerId = conv._id;
+            const user = await UserModel.findById(partnerId).select("displayName username avatarUrl");
+            if (!user) return null;
 
-                if (!otherParticipant) return null;
+            const isFriend = await FriendshipModel.exists({
+                $or: [
+                    { userId: userId, friendId: partnerId },
+                    { userId: partnerId, friendId: userId }
+                ]
+            });
 
-                const otherUser = await UserModel.findById(otherParticipant.userId)
-                    .select("displayName username avatarUrl");
-
-                if (!otherUser) return null;
-
-                return {
-                    _id: otherUser._id,
-                    conversationId: conv._id,
-                    user: {
-                        displayName: otherUser.displayName,
-                        username: otherUser.username,
-                        avatarUrl: otherUser.avatarUrl,
-                    },
-                    lastMessage: conv.lastMessage ? {
-                        text: conv.lastMessage.text,
-                        timestamp: conv.lastMessage.timestamp,
-                        senderId: conv.lastMessage.senderId
-                    } : null,
-                    unreadCount: conv.unreadCount?.get(userId) || 0,
-                    isFriend: false, // Populated later
-                };
-            })
-        );
-
-        const validConversations = formattedConversations.filter(Boolean);
-
-        const currentUser = await UserModel.findById(userId).select("friends");
-        const friendIds = currentUser?.friends.map((id: any) => id.toString()) || [];
-
-        return validConversations.map((conv: any) => ({
-            ...conv,
-            isFriend: friendIds.includes(conv._id.toString()),
+            return {
+                _id: partnerId,
+                conversationId: partnerId,
+                user: {
+                    displayName: user.displayName,
+                    username: user.username,
+                    avatarUrl: user.avatarUrl
+                },
+                lastMessage: {
+                    text: conv.lastMessage.text,
+                    timestamp: conv.lastMessage.timestamp,
+                    senderId: conv.lastMessage.senderId
+                },
+                unreadCount: conv.unreadCount,
+                isFriend: !!isFriend
+            };
         }));
+
+        return formatted.filter(Boolean);
     }
 
     async getMessages(currentUserId: string, targetUserId: string) {
-        const conversation = await Conversation.findOne({
-            "participants.userId": { $all: [currentUserId, targetUserId] }
-        }).sort({ 'messages.timestamp': 1 });
+        const messages = await MessageModel.find({
+            $or: [
+                { senderId: currentUserId, receiverId: targetUserId },
+                { senderId: targetUserId, receiverId: currentUserId }
+            ]
+        }).sort({ timestamp: 1 });
 
-        let messages: any[] = [];
-        if (conversation) {
-            messages = conversation.messages.map((msg: any) => ({
-                _id: msg._id,
-                senderId: msg.senderId,
-                receiverId: msg.receiverId,
-                text: msg.text,
-                timestamp: msg.timestamp,
-                isRead: msg.isRead
-            }));
-        }
+        const isFriend = await FriendshipModel.exists({
+            $or: [
+                { userId: currentUserId, friendId: targetUserId },
+                { userId: targetUserId, friendId: currentUserId }
+            ]
+        });
 
-        // Check friend status
-        const currentUser = await UserModel.findById(currentUserId);
-        const canSend = currentUser?.friends.some((id: any) => id.toString() === targetUserId) || false;
+        const canSend = !!isFriend;
 
         let requestStatus = 'none';
         let requestId = undefined;
 
         if (!canSend) {
-            const pendingRequest = await FriendRequestModel.findOne({
+            const pending = await FriendRequestModel.findOne({
                 $or: [
                     { sender: currentUserId, receiver: targetUserId },
                     { sender: targetUserId, receiver: currentUserId }
                 ],
                 status: 'pending'
             });
-
-            if (pendingRequest) {
-                if (pendingRequest.sender.toString() === currentUserId) {
-                    requestStatus = 'pending';
-                } else {
-                    requestStatus = 'received';
-                    requestId = pendingRequest._id;
-                }
+            if (pending) {
+                requestStatus = pending.sender.toString() === currentUserId ? 'pending' : 'received';
+                requestId = pending._id;
             }
         }
 
@@ -100,5 +100,13 @@ export class MessagesService {
             requestStatus,
             requestId
         };
+    }
+
+    async getUnreadCount(userId: string) {
+        const count = await MessageModel.countDocuments({
+            receiverId: userId,
+            isRead: false
+        });
+        return { count };
     }
 }
