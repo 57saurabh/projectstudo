@@ -9,6 +9,7 @@ import { MatchProposal } from '../models/MatchProposal';
 import { ChatModel } from '../models/Chat';
 import { MessageModel } from '../models/Message';
 import { FriendshipModel } from '../models/Friendship';
+import { FriendRequestModel } from '../models/FriendRequest';
 import { ActiveRoom } from '../models/ActiveRoom';
 
 /**
@@ -69,6 +70,13 @@ export class SocketGateway {
       socket.on('mark-seen', (d) => this.handleMarkSeen(socket, d));
       socket.on('typing', (d) => this.handleTyping(socket, d));
       socket.on('check-friendship', () => this.handleAutoFriendship(socket));
+
+      // FRIEND REQUESTS
+      socket.on('send-friend-request', (d) => this.handleSendFriendRequest(socket, d));
+      socket.on('withdraw-friend-request', (d) => this.handleWithdrawFriendRequest(socket, d));
+      socket.on('accept-friend-request', (d) => this.handleAcceptFriendRequest(socket, d));
+      socket.on('reject-friend-request', (d) => this.handleRejectFriendRequest(socket, d));
+      socket.on('check-friend-request-status', (d) => this.handleCheckFriendRequestStatus(socket, d));
     });
   }
 
@@ -408,8 +416,21 @@ export class SocketGateway {
   }
 
   // 🎯 8. HANDLE CHAT MESSAGES
-  private async handleChatMessage(socket: Socket, data: { chatId: string, text: string, receiverId?: string, type?: 'text' | 'image' | 'video', mediaData?: string, fileUrl?: string }) {
-    console.log(`[SocketGateway] handleChatMessage from ${socket.id}`, { ...data, mediaData: data.mediaData ? 'Base64<...>' : undefined });
+  private async handleChatMessage(socket: Socket, data: {
+    chatId: string,
+    text: string,
+    receiverId?: string,
+    type?: 'text' | 'image' | 'video' | 'file',
+    mediaData?: string,
+    fileUrl?: string,
+    viewMode?: 'once' | 'unlimited',
+    fileName?: string,
+    tempId?: string
+  }) {
+    console.log(`[SocketGateway] handleChatMessage from ${socket.id}`, {
+      ...data,
+      mediaData: data.mediaData ? 'Base64<...>' : undefined
+    });
     const senderUid = this.socketToUserId.get(socket.id);
     if (!senderUid) {
       console.warn(`[SocketGateway] User not authenticated for socket ${socket.id}`);
@@ -447,7 +468,11 @@ export class SocketGateway {
         fileUrl: data.fileUrl,
         chatId: data.chatId,
         timestamp: new Date(),
-        status: initialStatus
+        status: initialStatus,
+        viewMode: data.viewMode || 'unlimited',
+        isLocked: false,
+        viewCount: 0,
+        fileName: data.fileName
       });
 
       // Resolve userId for DB if not already set (i.e. if we used generic Socket ID)
@@ -478,7 +503,11 @@ export class SocketGateway {
             fileUrl: data.fileUrl,
             chatId: data.chatId,
             timestamp: new Date(),
-            status: 'delivered' // In-room is always delivered instantly
+            status: 'delivered', // In-room is always delivered instantly
+            viewMode: data.viewMode || 'unlimited',
+            isLocked: false,
+            viewCount: 0,
+            fileName: data.fileName
           });
           receiverUserId = this.socketToUserId.get(otherPeer);
         } else {
@@ -530,7 +559,7 @@ export class SocketGateway {
 
       if (finalChatId) {
         try {
-          await MessageModel.create({
+          const result = await MessageModel.create({
             chatId: finalChatId,
             senderId: senderUid,
             receiverId: receiverUserId,
@@ -539,7 +568,12 @@ export class SocketGateway {
             mediaData: data.mediaData,
             fileUrl: data.fileUrl,
             timestamp: new Date(),
-            status: initialStatus
+            status: initialStatus,
+            mediaType: (['image', 'video', 'file'].includes(data.type) ? data.type : null) as any,
+            viewMode: data.viewMode || 'unlimited',
+            isLocked: false,
+            viewCount: 0,
+            fileName: data.fileName
           });
 
           console.log('[SocketGateway] SUCCESS: Message persisted to DB.', {
@@ -551,9 +585,18 @@ export class SocketGateway {
           // Notify Sender of Delivery (if applicable)
           if (initialStatus === 'delivered') {
             socket.emit('message-delivered', {
-              messageId: 'pending', // ID not critical for now, timestamp helps
+              messageId: result._id, // Return Real DB ID
               chatId: finalChatId,
-              receiverId: receiverUserId
+              receiverId: receiverUserId,
+              tempId: data.tempId // Return Temp ID for mapping
+            });
+          } else {
+            // Offline Persistence ACK
+            socket.emit('message-sent', {
+              messageId: result._id,
+              chatId: finalChatId,
+              status: 'sent',
+              tempId: data.tempId
             });
           }
 
@@ -592,8 +635,12 @@ export class SocketGateway {
     }
   }
 
-  // 🎯 2. AUTO-FRIENDSHIP HANDLER
+
+  // 🎯 2. AUTO-FRIENDSHIP HANDLER (Keeping legacy for now, but extending with Friend Requests)
   private async handleAutoFriendship(socket: Socket) {
+    // ... (existing logic) ...
+    // Note: This logic seems to be for "Time-based auto friending" in random calls.
+    // I will leave it as is.
     const roomId = await this.roomService.getRoomId(socket.id);
     if (!roomId) return;
 
@@ -612,7 +659,6 @@ export class SocketGateway {
       const [userA, userB] = uids;
 
       // Create Bidirectional Friendship (Two docs or check existing)
-      // Using "findOneAndUpdate" with upsert to avoid duplicates
       await FriendshipModel.findOneAndUpdate(
         { userId: userA, friendId: userB },
         { userId: userA, friendId: userB },
@@ -635,6 +681,174 @@ export class SocketGateway {
         });
       });
       console.log(`[SocketGateway] Auto-Friendship created for ${userA} & ${userB}`);
+    }
+  }
+
+  // 🎯 2b. FRIEND REQUEST HANDLERS
+  private async handleSendFriendRequest(socket: Socket, data: { targetUserId: string }) {
+    const senderId = this.socketToUserId.get(socket.id);
+    if (!senderId) return;
+
+    console.log(`[SocketGateway] Friend Request: ${senderId} -> ${data.targetUserId}`);
+
+    // Check if already friends
+    const existing = await FriendshipModel.findOne({
+      $or: [
+        { userId: senderId, friendId: data.targetUserId },
+        { userId: data.targetUserId, friendId: senderId }
+      ]
+    });
+    if (existing) {
+      socket.emit('friend-request-error', { message: 'Already friends' });
+      return;
+    }
+
+    // Check if request already exists
+    const existingReq = await FriendRequestModel.findOne({
+      $or: [
+        { sender: senderId, receiver: data.targetUserId },
+        { sender: data.targetUserId, receiver: senderId }
+      ]
+    });
+
+    if (existingReq) {
+      if (existingReq.sender.toString() === senderId) {
+        socket.emit('friend-request-error', { message: 'Request already sent' });
+      } else {
+        socket.emit('friend-request-error', { message: 'Check pending requests' }); // They sent one to you
+      }
+      return;
+    }
+
+    // Create Request
+    const req = await FriendRequestModel.create({
+      sender: senderId,
+      receiver: data.targetUserId,
+      status: 'pending'
+    });
+
+    // Notify Receiver
+    const receiverSocketId = this.userIdToSocket.get(data.targetUserId);
+    if (receiverSocketId) {
+      const senderInfo = await this._publicUser(socket.id);
+      this.io.to(receiverSocketId).emit('friend-request-received', {
+        requestId: req._id,
+        sender: senderInfo
+      });
+    }
+
+    // Confirm to Sender
+    socket.emit('friend-request-sent', { success: true, targetId: data.targetUserId });
+  }
+
+  private async handleWithdrawFriendRequest(socket: Socket, data: { targetUserId: string }) {
+    const senderId = this.socketToUserId.get(socket.id);
+    if (!senderId) return;
+
+    const result = await FriendRequestModel.deleteOne({
+      sender: senderId,
+      receiver: data.targetUserId,
+      status: 'pending'
+    });
+
+    if (result.deletedCount > 0) {
+      socket.emit('friend-request-withdrawn-success', { targetId: data.targetUserId });
+      // Notify receiver so they can remove the banner?
+      const receiverSocketId = this.userIdToSocket.get(data.targetUserId);
+      if (receiverSocketId) {
+        this.io.to(receiverSocketId).emit('friend-request-cancelled', { senderId });
+      }
+    }
+  }
+
+  private async handleAcceptFriendRequest(socket: Socket, data: { senderId: string }) {
+    const receiverId = this.socketToUserId.get(socket.id);
+    if (!receiverId) return;
+
+    const req = await FriendRequestModel.findOne({
+      sender: data.senderId,
+      receiver: receiverId,
+      status: 'pending'
+    });
+
+    if (!req) return; // Expired or invalid
+
+    // 1. Create Friendship (Bidirectional)
+    await FriendshipModel.findOneAndUpdate(
+      { userId: data.senderId, friendId: receiverId },
+      { userId: data.senderId, friendId: receiverId },
+      { upsert: true, new: true }
+    );
+    await FriendshipModel.findOneAndUpdate(
+      { userId: receiverId, friendId: data.senderId },
+      { userId: receiverId, friendId: data.senderId },
+      { upsert: true, new: true }
+    );
+
+    // Sync legacy User.friends array
+    await UserModel.updateOne({ _id: data.senderId }, { $addToSet: { friends: receiverId } });
+    await UserModel.updateOne({ _id: receiverId }, { $addToSet: { friends: data.senderId } });
+
+    // 2. Delete Request
+    await FriendRequestModel.deleteOne({ _id: req._id });
+
+    // 3. Notify Both
+    socket.emit('friendship-created', { friendId: data.senderId });
+
+    const senderSocketId = this.userIdToSocket.get(data.senderId);
+    if (senderSocketId) {
+      const receiverInfo = await this._publicUser(socket.id);
+      this.io.to(senderSocketId).emit('friendship-created', { friendId: receiverId });
+      this.io.to(senderSocketId).emit('friend-request-accepted', { acceptor: receiverInfo });
+    }
+  }
+
+  private async handleRejectFriendRequest(socket: Socket, data: { senderId: string }) {
+    const receiverId = this.socketToUserId.get(socket.id);
+    if (!receiverId) return;
+
+    await FriendRequestModel.deleteOne({
+      sender: data.senderId,
+      receiver: receiverId
+    });
+
+    socket.emit('friend-request-rejected-success', { senderId: data.senderId });
+  }
+
+  private async handleCheckFriendRequestStatus(socket: Socket, data: { targetUserId: string }) {
+    const userId = this.socketToUserId.get(socket.id);
+    if (!userId) return;
+
+    // 1. Check Friendship
+    const friend = await FriendshipModel.findOne({
+      $or: [
+        { userId, friendId: data.targetUserId },
+        { userId: data.targetUserId, friendId: userId }
+      ]
+    });
+
+    if (friend) {
+      socket.emit('friend-request-status', { status: 'friends', targetId: data.targetUserId });
+      return;
+    }
+
+    // 2. Check Pending Request
+    const req = await FriendRequestModel.findOne({
+      $or: [
+        { sender: userId, receiver: data.targetUserId },
+        { sender: data.targetUserId, receiver: userId }
+      ],
+      status: 'pending'
+    });
+
+    if (req) {
+      if (req.sender.toString() === userId) {
+        socket.emit('friend-request-status', { status: 'pending_sent', targetId: data.targetUserId });
+      } else {
+        socket.emit('friend-request-status', { status: 'pending_received', targetId: data.targetUserId, requestId: req._id });
+      }
+    } else {
+      socket.emit('friend-request-status', { status: 'none', targetId: data.targetUserId });
     }
   }
 

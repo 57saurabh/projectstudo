@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useRef, useCallback, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
+import { useRouter, usePathname } from 'next/navigation'; // Added imports
 import { useCallStore } from '../store/useCallStore';
 import { useSelector } from 'react-redux';
 import { RootState } from '../store/store';
@@ -29,6 +30,8 @@ interface SignalingContextType {
 const SignalingContext = createContext<SignalingContextType | null>(null);
 
 export const SignalingProvider = ({ children }: { children: React.ReactNode }) => {
+    const router = useRouter(); // Initialize router
+    const pathname = usePathname(); // Initialize pathname
     // Use state to trigger re-renders when socket is created
     const [socket, setSocket] = useState<Socket | null>(null);
     const socketRef = useRef<Socket | null>(null); // Keep ref for internal robust access in callbacks
@@ -292,6 +295,14 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
         socket.on('friendship-created', (data) => {
             toast.success("You are now friends! Chat unlocked forever.");
             useCallStore.getState().setIsFriend(true);
+
+            useCallStore.getState().addNotification({
+                type: 'friend',
+                title: 'New Friend!',
+                description: `You are now friends with ${data.friendName || 'someone'}.`,
+                link: `/messages?userId=${data.friendId}`,
+                avatarUrl: data.friendAvatar
+            });
         });
 
         socket.on('user-joined', (data) => {
@@ -337,10 +348,24 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
 
             // If incoming message 
             if (data.senderId !== user?.id) {
-                // FIX: Show correct name in toast
-                toast(data.senderName || 'Partner', {
-                    description: data.text,
-                });
+                const { chatId, addNotification } = useCallStore.getState();
+                const isCurrentChat = (pathname === '/messages') && (chatId === data.senderId || chatId === data.chatId);
+
+                if (!isCurrentChat) {
+                    // Add to Notification Store
+                    addNotification({
+                        type: 'message',
+                        title: data.senderName || 'New Message',
+                        description: data.text || (data.mediaType ? `Sent a ${data.mediaType}` : 'Sent a message'),
+                        avatarUrl: data.senderAvatar,
+                        link: `/messages?userId=${data.senderId}`
+                    });
+
+                    toast(data.senderName || 'Partner', {
+                        description: data.text || 'Sent a media message',
+                        action: { label: 'View', onClick: () => router.push(`/messages?userId=${data.senderId}`) }
+                    });
+                }
             }
         });
 

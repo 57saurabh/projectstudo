@@ -19,24 +19,39 @@ export interface ParticipantPublic {
 }
 
 export interface ChatMessage {
+  _id?: string;
   chatId?: string;
   senderId: string;
   senderName: string;
   senderAvatar?: string;
   text: string;
-  timestamp: Date | string | number; // flexible
+  timestamp: Date | string | number;
   isSystem?: boolean;
+  status?: 'pending' | 'sent' | 'delivered' | 'seen';
+
+  // Media Extension
+  mediaType?: 'image' | 'video' | 'file';
+  mediaData?: string;
+  fileName?: string;
+  viewMode?: 'once' | 'unlimited';
+  isLocked?: boolean;
+  viewCount?: number;
+  isViewed?: boolean; // Client-side helper for view-once status
 }
 
-export interface PendingInvite {
-  roomId: string;
-  senderId: string;
-  senderName: string;
-  avatarUrl?: string;
+export interface Notification {
+  id: string;
+  type: 'message' | 'friend' | 'system' | 'online';
+  title: string;
+  description?: string;
+  timestamp: string | Date;
+  isRead: boolean;
+  link?: string;
+  avatarUrl?: string; // Optional avatar
 }
 
-interface Proposal {
-  roomId: string;
+export interface Proposal {
+  roomId: string; // The signaling room ID
   type: 'incoming' | 'outgoing';
   candidate: ParticipantPublic; // The other person to show in UI
   participants: ParticipantPublic[];
@@ -45,6 +60,11 @@ interface Proposal {
 }
 
 interface CallStore {
+  notifications: Notification[];
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => void;
+  markNotificationAsRead: (id: string) => void;
+  clearNotifications: () => void;
+
   callState: CallState;
   setCallState: (s: CallState) => void;
 
@@ -98,6 +118,23 @@ export const useCallStore = create<CallStore>()((set, get) => ({
 
   currentRoomId: null,
   setCurrentRoomId: (id) => set({ currentRoomId: id }),
+
+  notifications: [],
+  addNotification: (data) => set((state) => ({
+    notifications: [
+      {
+        id: Math.random().toString(36).substr(2, 9),
+        timestamp: new Date().toISOString(),
+        isRead: false,
+        ...data
+      },
+      ...state.notifications
+    ].slice(0, 50) // Keep last 50
+  })),
+  markNotificationAsRead: (id) => set((state) => ({
+    notifications: state.notifications.map(n => n.id === id ? { ...n, isRead: true } : n)
+  })),
+  clearNotifications: () => set({ notifications: [] }),
 
   localStream: null,
   setLocalStream: (s) => set({ localStream: s }),

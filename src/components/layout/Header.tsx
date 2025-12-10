@@ -4,10 +4,120 @@ import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '@/lib/store/store';
-import { Bell, Search, Settings, LogOut, User } from 'lucide-react';
+import { Bell, Search, Settings, LogOut, User, MessageCircle, UserPlus, Zap } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { logout } from '@/lib/store/authSlice';
+import { useSignaling } from '@/lib/webrtc/SignalingContext';
+import { useCallStore } from '@/lib/store/useCallStore'; // Import Store
 import Link from 'next/link';
+
+const NotificationBell = () => {
+    const { unreadCount } = useSignaling();
+    const router = useRouter();
+    const [isOpen, setIsOpen] = useState(false);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    // Get notifications from store
+    const notifications = useCallStore((s) => s.notifications);
+    const markAsRead = useCallStore((s) => s.markNotificationAsRead);
+
+    // Close when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleClick = (n: any) => {
+        markAsRead(n.id);
+        setIsOpen(false);
+        if (n.link) router.push(n.link);
+    };
+
+    const hasUnread = unreadCount > 0 || notifications.some(n => !n.isRead);
+
+    return (
+        <div className="relative" ref={dropdownRef}>
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="p-2 lg:p-2.5 rounded-2xl hover:bg-surface-hover text-text-secondary hover:text-gold transition-colors relative shadow-sm hover:shadow-gold/10"
+            >
+                <Bell size={20} />
+                {hasUnread && (
+                    <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-danger text-[10px] font-bold text-white shadow-danger-glow">
+                        {(unreadCount + notifications.filter(n => !n.isRead).length) > 9 ? '9+' : (unreadCount + notifications.filter(n => !n.isRead).length)}
+                    </span>
+                )}
+            </button>
+
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute right-0 top-full mt-4 w-80 bg-surface/90 backdrop-blur-xl rounded-3xl shadow-2xl border border-border overflow-hidden z-50 ring-1 ring-gold/10"
+                    >
+                        <div className="p-4 border-b border-border bg-surface-hover/30 flex justify-between items-center">
+                            <h3 className="font-bold text-text-primary">Notifications</h3>
+                            <span className="text-xs text-gold font-medium">{notifications.length} New</span>
+                        </div>
+
+                        <div className="max-h-80 overflow-y-auto custom-scrollbar">
+                            {notifications.length === 0 && unreadCount === 0 ? (
+                                <div className="p-8 text-center text-text-muted text-sm">
+                                    No new notifications
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-border/50">
+                                    {/* Show Unread Messages Header if any */}
+                                    {unreadCount > 0 && (
+                                        <div
+                                            onClick={() => { setIsOpen(false); router.push('/messages'); }}
+                                            className="p-4 hover:bg-surface-hover cursor-pointer transition-colors flex items-start gap-3 bg-gold/5"
+                                        >
+                                            <div className="p-2 rounded-full bg-gold/20 text-gold mt-1"><MessageCircle size={16} /></div>
+                                            <div>
+                                                <p className="font-bold text-sm text-text-primary">Unread Messages</p>
+                                                <p className="text-xs text-text-muted">You have {unreadCount} unread chats.</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {notifications.map((n) => (
+                                        <div
+                                            key={n.id}
+                                            onClick={() => handleClick(n)}
+                                            className={`p-4 hover:bg-surface-hover cursor-pointer transition-colors flex items-start gap-3 ${!n.isRead ? 'bg-surface-hover/50' : ''}`}
+                                        >
+                                            <div className="p-2 rounded-full bg-surface border border-border mt-1">
+                                                {n.type === 'message' ? <MessageCircle size={16} className="text-blue-400" /> :
+                                                    n.type === 'friend' ? <UserPlus size={16} className="text-green-400" /> :
+                                                        <Zap size={16} className="text-gold" />}
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-sm text-text-primary">{n.title}</p>
+                                                <p className="text-xs text-text-muted line-clamp-2">{n.description}</p>
+                                                <p className="text-[10px] text-text-muted/60 mt-1">{new Date(n.timestamp).toLocaleTimeString()}</p>
+                                            </div>
+                                            {!n.isRead && (
+                                                <div className="w-2 h-2 rounded-full bg-gold mt-2 ml-auto shrink-0" />
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+};
 
 export default function Header() {
     const pathname = usePathname();
@@ -79,10 +189,7 @@ export default function Header() {
             <div className="flex items-center gap-3 lg:gap-6 z-20">
                 {/* Icons */}
                 <div className="flex items-center gap-2">
-                    <button className="p-2 lg:p-2.5 rounded-2xl hover:bg-surface-hover text-text-secondary hover:text-gold transition-colors relative shadow-sm hover:shadow-gold/10">
-                        <Bell size={20} />
-                        <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-danger rounded-full border-2 border-surface shadow-danger-glow" />
-                    </button>
+                    <NotificationBell />
                     {/* Settings Icon Removed */}
                 </div>
 

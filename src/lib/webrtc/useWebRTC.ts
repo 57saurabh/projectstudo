@@ -23,6 +23,7 @@ export function useWebRTC(localVideoRef: React.RefObject<HTMLVideoElement | null
   const setRemoteScreenShare = useCallStore((s) => s.setRemoteScreenShare);
 
   const pcs = useRef<PeerMap>({});
+  const makingOfferMap = useRef<Record<string, boolean>>({});
   const localStreamRef = useRef<MediaStream | null>(null);
   const localScreenStreamRef = useRef<MediaStream | null>(null);
 
@@ -148,11 +149,20 @@ export function useWebRTC(localVideoRef: React.RefObject<HTMLVideoElement | null
 
     pc.onnegotiationneeded = async () => {
       try {
+        makingOfferMap.current[remoteId] = true;
         console.log('[useWebRTC] Negotiation needed for', remoteId);
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
-        socket?.emit('offer', { target: remoteId, sdp: pc.localDescription });
-      } catch (e) { console.error('Negotiation failed', e); }
+
+        // Modern WebRTC: setLocalDescription() without args creates offer implicitly
+        await pc.setLocalDescription();
+
+        if (pc.localDescription) {
+          socket?.emit('offer', { target: remoteId, sdp: pc.localDescription });
+        }
+      } catch (e) {
+        console.error('Negotiation failed', e);
+      } finally {
+        makingOfferMap.current[remoteId] = false;
+      }
     };
 
     pc.onconnectionstatechange = () => {
@@ -189,72 +199,46 @@ export function useWebRTC(localVideoRef: React.RefObject<HTMLVideoElement | null
   // Signaling Handlers with PERFECT NEGOTIATION Pattern
   useEffect(() => {
     if (!socket) return;
-
-    // We maintain a "makingOffer" flag to handle glare (collision)
-    // However, since we are using functional components, we need a ref map for per-peer state
-    // Or simpler: Use the "Polite Peer" convention.
-    // IMPOLITE: High ID (or Low? Convention: High ID is polite? Actually whatever is consistent)
-    // Let's say: socket.id < remoteId => Initiator (Impolite/Superior). socket.id > remoteId => Follower (Polite)
-    // Wait, Standard: "Polite" peer rolls back.
-    // If we are Polite, and we collide, WE rollback.
-    // If we are Impolite, and we collide, WE ignore their offer (they will rollback).
-
-    // BUT we need to track if we are currently making an offer to avoid processing answers as offers?
-    // Actually, locking is handled by the queue usually.
-    // Simplified Perfect Negotiation:
-
-    const ignoreOffer = (contactId: string, description: RTCSessionDescriptionInit) => {
-      const pc = pcs.current[contactId];
-      if (!pc) return true;
-      // Check for Glare
-      const isPolite = (socket.id || '') > contactId; // Arbitrary consistency
-      const isStable = pc.signalingState === 'stable' || (pc.signalingState === 'have-local-offer' && !description); // Loose check
-      // Strict:
-      const readyForOffer = !pc.signalingState || pc.signalingState === 'stable' || pc.signalingState === 'have-remote-offer';
-      const offerCollision = (description.type === 'offer') && !readyForOffer;
-
-      if (offerCollision && !isPolite) {
-        return true; // Ignore offer
-      }
-      return false;
-    };
-
     const onOffer = async ({ sender, sdp }: { sender: string; sdp: any }) => {
       console.log('[useWebRTC] offer from', sender);
-      const pc = createPeer(sender); // Ensure PC exists
+      const pc = createPeer(sender);
 
       // COLLISION HANDLING
       const isPolite = (socket.id || '') > sender;
+      // We are making an offer if the flag is true
+      const makingOffer = makingOfferMap.current[sender] || false;
       const readyForOffer = !pc.signalingState || pc.signalingState === 'stable' || pc.signalingState === 'have-remote-offer';
-      const offerCollision = (sdp.type === 'offer') && !readyForOffer;
 
-      ignoreOfferRef.current = ignoreOfferRef.current || {};
+      const offerCollision = (sdp.type === 'offer') && (makingOffer || !readyForOffer);
+
       if (offerCollision && !isPolite) {
         console.warn('[useWebRTC] GLARE. Impolite ignore.');
-        return;
+        return; // Impolite peer ignores colliding offer
       }
 
       try {
         if (offerCollision && isPolite) {
           console.log('[useWebRTC] GLARE. Polite rollback.');
-          // We are polite, we rollback our local offer (if any) to accept theirs
-          await Promise.all([
-            pc.setLocalDescription({ type: 'rollback' }),
-            pc.setRemoteDescription(new RTCSessionDescription(sdp))
-          ]);
-        } else {
-          await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+          // Polite peer rolls back to accept impolite offer
+          await pc.setLocalDescription({ type: 'rollback' });
         }
+
+        await pc.setRemoteDescription(new RTCSessionDescription(sdp));
+
+        // Answer if it's an offer (implicit in negotiation usually but explicit here)
+        if (sdp.type === 'offer') {
+          await pc.setLocalDescription(); // Create answer
+          socket?.emit('answer', { target: sender, sdp: pc.localDescription });
+        }
+
         // FLUSH ICE QUEUE
         await processIceQueue(sender, pc);
-
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        socket.emit('answer', { target: sender, sdp: pc.localDescription });
-      } catch (e) {
-        console.error('[useWebRTC] onOffer error', e);
+      } catch (err) {
+        console.error('[useWebRTC] Error handling offer', err);
       }
     };
+
+
 
     const onAnswer = async ({ sender, sdp }: { sender: string; sdp: any }) => {
       const pc = pcs.current[sender];

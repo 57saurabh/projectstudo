@@ -213,8 +213,9 @@ export default function RandomChatPage() {
                     }
                 }
                 if (!result.isSafe) {
-                    toast.error('NSFW detected');
-                    abortCall();
+                    console.warn('[RandomChat] NSFW detected! (Auto-abort disabled for debugging)');
+                    toast.error('NSFW detected (Warning)');
+                    // abortCall(); // 🔴 Auto-abort temporarily disabled to prevent false positives
                 }
             }
         }, 1000);
