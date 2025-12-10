@@ -1,7 +1,6 @@
 import { useRef, useEffect, useState } from 'react';
 import { Send, Smile } from 'lucide-react';
 import { ChatMessage } from '@/lib/store/useCallStore';
-import Input from '@/components/ui/Input';
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react';
 
 interface ChatAreaProps {
@@ -77,43 +76,50 @@ export default function ChatArea({
 
     if (!showChat) return null;
 
-    // Logic for Disabling Input
-    // 1. If currently in call (currentPeerId exists/active) -> Enabled (Requirement 8)
-    // 2. If call ended (!currentPeerId):
-    //    - If isFriend -> Enabled
-    //    - If !isFriend -> Disabled
-
-    // Note: page.tsx determines "currentPeerId" based on active participant.
-    // If call ends, currentPeerId might become undefined.
-
     const isCallActive = !!currentPeerId;
     const canSend = isCallActive || isFriend;
 
-    // If call ended and not friend, show warning inside input placeholder or separate message
-
     return (
         <div className="w-full lg:w-[360px] flex-shrink-0 flex flex-col bg-surface rounded-3xl overflow-hidden border border-border h-[35vh] min-h-[250px] lg:h-auto transition-all duration-300 shadow-xl relative">
-            <div className="flex-1 flex flex-col p-4 gap-4 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-                {messages.map((msg, idx) => (
-                    <div key={idx} className={`flex items-end gap-2 ${msg.senderId === user?.id ? 'justify-end' : ''} animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                        {msg.senderId !== user?.id && !msg.isSystem && (
-                            <div className="w-8 h-8 rounded-full bg-surface-hover border border-border flex-shrink-0" />
-                        )}
-                        <div className={`flex flex-col gap-1 ${msg.senderId === user?.id ? 'items-end' : 'items-start'} ${msg.isSystem ? 'w-full items-center' : ''}`}>
-                            {!msg.isSystem && msg.senderId !== user?.id && (
-                                <p className="text-text-muted text-[11px] font-bold ml-1">{msg.senderName}</p>
-                            )}
-                            <div className={`max-w-[240px] rounded-2xl px-4 py-2.5 text-sm font-medium shadow-sm break-words ${msg.isSystem
-                                ? 'bg-surface-hover text-text-muted text-xs text-center italic w-full'
-                                : (msg.senderId === user?.id
-                                    ? 'bg-gold text-primary rounded-tr-none shadow-gold-glow'
-                                    : 'bg-surface-hover text-text-primary border border-border rounded-tl-none')
-                                } `}>
-                                {msg.text}
+            {/* Messages List - Enhanced with Avatar/Name */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+                {messages.map((msg, index) => {
+                    const isMe = msg.senderId === 'me' || msg.senderId === user?.id || (user as any)?._id === msg.senderId;
+                    // Fallback avatar if missing
+                    const avatarUrl = msg.senderAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.senderId}`;
+                    const displayName = msg.senderName || 'Anonymous';
+
+                    return (
+                        <div key={index} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                            {/* Avatar */}
+                            <div className="flex flex-col items-center gap-1">
+                                <img
+                                    src={avatarUrl}
+                                    className="w-8 h-8 rounded-full bg-surface-hover object-cover border border-border"
+                                    alt="avatar"
+                                />
+                            </div>
+
+                            <div className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[80%]`}>
+                                {/* Username */}
+                                <span className="text-[10px] text-text-muted mb-1 px-1">
+                                    {displayName}
+                                </span>
+
+                                {/* Bubble */}
+                                <div className={`px-4 py-2 rounded-2xl text-sm ${isMe
+                                    ? 'bg-gold text-primary rounded-tr-none'
+                                    : 'bg-surface-hover text-text-primary rounded-tl-none border border-border'
+                                    }`}>
+                                    {msg.text}
+                                </div>
+                                <span className="text-[10px] text-text-muted mt-1 px-1">
+                                    {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </span>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
                 {/* Typing Indicator */}
                 {remoteIsTyping && (
                     <div className="flex items-center gap-2 mb-2 ml-4">
@@ -128,29 +134,29 @@ export default function ChatArea({
                 <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-3 border-t border-border bg-surface relative">
+            {/* Input Area */}
+            <div className="p-4 bg-surface/50 backdrop-blur-md border-t border-border relative z-50">
                 {/* Warning if Locked */}
                 {!canSend && (
-                    <div className="mb-2 text-center text-xs text-red-400 bg-red-400/10 p-2 rounded-lg border border-red-400/20 font-medium">
+                    <div className="mb-2 text-center text-xs text-danger bg-danger/10 p-2 rounded-lg border border-danger/20 font-medium">
                         Add friend to continue chatting
                     </div>
                 )}
 
-                <div className="relative" ref={emojiRef}>
-                    {showEmojiPicker && (
-                        <div className="absolute bottom-14 left-0 z-50 shadow-2xl rounded-2xl border border-border overflow-hidden">
-                            <EmojiPicker
-                                onEmojiClick={onEmojiClick}
-                                theme={Theme.AUTO}
-                                height={350}
-                                width={300}
-                                searchDisabled={false}
-                            />
-                        </div>
-                    )}
-                </div>
+                {/* Emoji Picker */}
+                {showEmojiPicker && (
+                    <div className="absolute bottom-full left-0 mb-2 z-50 shadow-2xl rounded-xl overflow-hidden border border-border" ref={emojiRef}>
+                        <EmojiPicker
+                            onEmojiClick={onEmojiClick}
+                            theme={Theme.DARK}
+                            width={300}
+                            height={350}
+                            searchDisabled={false}
+                        />
+                    </div>
+                )}
 
-                <form onSubmit={onSendMessage} className="flex items-center gap-2">
+                <div className="flex gap-2">
                     <button
                         type="button"
                         onClick={() => setShowEmojiPicker(!showEmojiPicker)}
@@ -160,26 +166,26 @@ export default function ChatArea({
                     >
                         <Smile size={20} />
                     </button>
-
-                    <div className="flex-1">
-                        <Input
-                            value={inputMessage}
-                            onChange={(e) => handleTyping(e.target.value)}
-                            disabled={!canSend}
-                            placeholder={canSend ? "Message..." : "Locked"}
-                            className="bg-surface-hover border-transparent focus:bg-background h-10"
-                            rightElement={
-                                <button
-                                    type="submit"
-                                    disabled={!canSend || !inputMessage.trim()}
-                                    className="text-text-muted hover:text-gold disabled:opacity-50 disabled:cursor-not-allowed transition-colors p-1"
-                                >
-                                    <Send size={18} />
-                                </button>
-                            }
-                        />
-                    </div>
-                </form>
+                    <input
+                        type="text"
+                        value={inputMessage}
+                        onChange={(e) => handleTyping(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') onSendMessage(e);
+                        }}
+                        placeholder={canSend ? "Type a message..." : "Chat locked"}
+                        disabled={!canSend}
+                        className="flex-1 bg-surface-hover border border-border rounded-xl px-4 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold/50 focus:bg-surface-hover transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    />
+                    <button
+                        type="button"
+                        onClick={onSendMessage}
+                        disabled={!canSend || !inputMessage.trim()}
+                        className="p-3 bg-gold text-primary rounded-xl hover:bg-gold-hover shadow-lg shadow-gold/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 flex items-center justify-center aspect-square"
+                    >
+                        <Send size={18} />
+                    </button>
+                </div>
             </div>
         </div>
     );

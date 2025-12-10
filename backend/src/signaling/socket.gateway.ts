@@ -66,6 +66,7 @@ export class SocketGateway {
 
       // CHAT & FRIENDSHIP
       socket.on('chat-message', (d) => this.handleChatMessage(socket, d));
+      socket.on('mark-seen', (d) => this.handleMarkSeen(socket, d));
       socket.on('typing', (d) => this.handleTyping(socket, d));
       socket.on('check-friendship', () => this.handleAutoFriendship(socket));
     });
@@ -278,25 +279,84 @@ export class SocketGateway {
         await this.roomService.createRoom(roomId, proposal.participants);
 
         // 🎯 1. CREATE NEW CHAT SESSION
+        // 6. CHECK FRIENDSHIP & CHAT HISTORY
         const participantUserIds = proposal.participants
           .map(sid => this.socketToUserId.get(sid))
           .filter(Boolean) as string[];
 
-        let chatId = null;
+        let chatId: string | null = null;
+        let isFriend = false;
+        let historyMessages: any[] = [];
+
         if (participantUserIds.length === 2) {
-          const newChat = await ChatModel.create({
-            participants: participantUserIds
+          const [userA, userB] = participantUserIds.sort(); // Sort to ensure consistent order for queries
+
+          // Check Friendship
+          const friendship = await FriendshipModel.findOne({
+            $or: [
+              { userId: userA, friendId: userB },
+              { userId: userB, friendId: userA }
+            ]
           });
-          chatId = newChat._id;
+
+          if (friendship) {
+            isFriend = true;
+          }
+
+          // Find Existing Chat or Create New
+          let chat = await ChatModel.findOne({
+            participants: { $all: [userA, userB], $size: 2 }
+          });
+
+          if (chat) {
+            chatId = chat._id.toString();
+            // Load History
+            historyMessages = await MessageModel.find({ chatId })
+              .sort({ timestamp: 1 }) // Oldest first for UI
+              .limit(50)
+              .lean(); // Use .lean() for plain JS objects
+          } else {
+            // Create New Chat
+            const newChat = await ChatModel.create({
+              participants: [userA, userB],
+              createdAt: new Date(),
+              updatedAt: new Date()
+            });
+            chatId = newChat._id.toString();
+          }
         }
 
+        // Populate peers info
         const peers = await Promise.all(proposal.participants.map(id => this._publicUser(id)));
 
-        proposal.participants.forEach((pid) => {
-          const otherPeers = peers.filter(p => p.peerId !== pid);
-          // Send chatID to client
-          this.io.to(pid).emit('room-created', { roomId, peers: otherPeers, chatId });
-          this.io.to(pid).emit('recommendation-ended', { reason: 'accepted' });
+        // Emit room-created with Chat Info
+        proposal.participants.forEach((socketId) => {
+          const otherPeers = peers.filter(p => p.peerId !== socketId);
+          this.io.to(socketId).emit('room-created', {
+            roomId,
+            peers: otherPeers,
+            chatId,
+            isFriend,
+          });
+
+          // Emit History if available
+          if (historyMessages.length > 0 && chatId) {
+            const hydratedHistory = historyMessages.map((msg: any) => {
+              // Determine sender's public info for the message
+              const senderPublicInfo = peers.find(p => this.socketToUserId.get(p.peerId) === msg.senderId.toString());
+              return {
+                ...msg,
+                senderName: senderPublicInfo?.username || 'Unknown',
+                senderAvatar: senderPublicInfo?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${msg.senderId}`,
+              };
+            });
+
+            this.io.to(socketId).emit('chat-history', {
+              chatId,
+              messages: hydratedHistory
+            });
+          }
+          this.io.to(socketId).emit('recommendation-ended', { reason: 'accepted' });
         });
       }
     }
@@ -348,23 +408,30 @@ export class SocketGateway {
   }
 
   // 🎯 8. HANDLE CHAT MESSAGES
-  private async handleChatMessage(socket: Socket, data: { chatId: string, text: string, receiverId?: string }) {
-    console.log(`[SocketGateway] handleChatMessage from ${socket.id}`, data);
+  private async handleChatMessage(socket: Socket, data: { chatId: string, text: string, receiverId?: string, type?: 'text' | 'image' | 'video', mediaData?: string, fileUrl?: string }) {
+    console.log(`[SocketGateway] handleChatMessage from ${socket.id}`, { ...data, mediaData: data.mediaData ? 'Base64<...>' : undefined });
     const senderUid = this.socketToUserId.get(socket.id);
     if (!senderUid) {
       console.warn(`[SocketGateway] User not authenticated for socket ${socket.id}`);
       return;
     }
 
-    // data.receiverId comes from frontend's "peerId" which is the socketId.
     let targetSocketId = data.receiverId;
     let receiverUserId: string | undefined;
 
-    console.log(`[SocketGateway] Raw receiverId: ${data.receiverId}, SenderUID: ${senderUid}`);
+    // Check if receiverId is a User ID map-able to a Socket ID
+    if (data.receiverId && this.userIdToSocket.has(data.receiverId)) {
+      targetSocketId = this.userIdToSocket.get(data.receiverId);
+      receiverUserId = data.receiverId;
+    }
 
-    // Fetch Sender Details for UI
     const sender = await this._publicUser(socket.id);
     const senderName = sender?.username || 'Unknown';
+    const senderAvatar = sender?.avatarUrl;
+
+    // Determine Status
+    const isOnline = !!targetSocketId;
+    const initialStatus = isOnline ? 'delivered' : 'sent';
 
     // 1. Try Direct Emit if targetSocketId is provided
     if (targetSocketId) {
@@ -373,14 +440,21 @@ export class SocketGateway {
       this.io.to(targetSocketId).emit('chat-message', {
         senderId: senderUid,
         senderName,
+        senderAvatar,
         text: data.text,
+        type: data.type || 'text',
+        mediaData: data.mediaData,
+        fileUrl: data.fileUrl,
         chatId: data.chatId,
-        timestamp: new Date()
+        timestamp: new Date(),
+        status: initialStatus
       });
 
-      // Resolve userId for DB
-      receiverUserId = this.socketToUserId.get(targetSocketId);
-      console.log(`[SocketGateway] Resolved receiverUserId from socket: ${receiverUserId}`);
+      // Resolve userId for DB if not already set (i.e. if we used generic Socket ID)
+      if (!receiverUserId) {
+        receiverUserId = this.socketToUserId.get(targetSocketId);
+        console.log(`[SocketGateway] Resolved receiverUserId from socket: ${receiverUserId}`);
+      }
     }
 
     // 2. Fallback: User not provided or not found? Try inferred from Room
@@ -393,13 +467,18 @@ export class SocketGateway {
         const otherPeer = participants.find(p => p !== socket.id);
         if (otherPeer) {
           targetSocketId = otherPeer; // Found
-          console.log(`[SocketGateway] Found likely peer in room: ${otherPeer}`);
+          // If we found them, they are effectively online/delivered for this room context
           this.io.to(otherPeer).emit('chat-message', {
             senderId: senderUid,
             senderName,
+            senderAvatar,
             text: data.text,
+            type: data.type || 'text',
+            mediaData: data.mediaData,
+            fileUrl: data.fileUrl,
             chatId: data.chatId,
-            timestamp: new Date()
+            timestamp: new Date(),
+            status: 'delivered' // In-room is always delivered instantly
           });
           receiverUserId = this.socketToUserId.get(otherPeer);
         } else {
@@ -410,15 +489,105 @@ export class SocketGateway {
       }
     }
 
+    // 2b. CRITICAL FALLBACK for Offline Persistence
+    // If receiverUserId is still undefined, but data.receiverId looks like a UserID (24 chars), use it.
+    if (!receiverUserId && data.receiverId && data.receiverId.length === 24) {
+      receiverUserId = data.receiverId;
+      console.log(`[SocketGateway] receiverUserId set to data.receiverId (Offline/DbOnly): ${receiverUserId}`);
+    }
+
     // 3. Save to DB (Persistent History)
     // We need both User IDs.
     if (senderUid && receiverUserId) {
-      await MessageModel.create({
-        chatId: data.chatId,
-        senderId: senderUid,
-        receiverId: receiverUserId,
-        text: data.text,
-        timestamp: new Date()
+
+      let finalChatId = data.chatId;
+
+      // CRITICAL FIX: Frontend might send receiverId as chatId. 
+      // We must ensure we have the REAL Chat Document ID.
+      // Always look up / create the Chat document based on participants to be safe.
+      try {
+        // Find chat where these two are participants
+        let chat = await ChatModel.findOne({
+          participants: { $all: [senderUid, receiverUserId], $size: 2 }
+        });
+
+        if (!chat) {
+          chat = await ChatModel.create({
+            participants: [senderUid, receiverUserId],
+            createdAt: new Date(),
+            updatedAt: new Date()
+          });
+          console.log(`[SocketGateway] Created new Chat ${chat._id} for message persistence`);
+        } else {
+          // Update the timestamp of the existing chat
+          await ChatModel.updateOne({ _id: chat._id }, { updatedAt: new Date() });
+        }
+        finalChatId = chat._id.toString();
+
+      } catch (err) {
+        console.error('[SocketGateway] Error finding/creating chat for message:', err);
+      }
+
+      if (finalChatId) {
+        try {
+          await MessageModel.create({
+            chatId: finalChatId,
+            senderId: senderUid,
+            receiverId: receiverUserId,
+            text: data.text,
+            type: data.type || 'text',
+            mediaData: data.mediaData,
+            fileUrl: data.fileUrl,
+            timestamp: new Date(),
+            status: initialStatus
+          });
+
+          console.log('[SocketGateway] SUCCESS: Message persisted to DB.', {
+            sid: senderUid,
+            rid: receiverUserId,
+            cid: finalChatId
+          });
+
+          // Notify Sender of Delivery (if applicable)
+          if (initialStatus === 'delivered') {
+            socket.emit('message-delivered', {
+              messageId: 'pending', // ID not critical for now, timestamp helps
+              chatId: finalChatId,
+              receiverId: receiverUserId
+            });
+          }
+
+        } catch (dbErr) {
+          console.error('[SocketGateway] Failed to save message to DB:', dbErr);
+        }
+      } else {
+        console.warn(`[SocketGateway] Failed to save message: Could not resolve chatId for ${senderUid}->${receiverUserId}`);
+      }
+    }
+  }
+
+  // 🎯 8b. MARK SEEN
+  private async handleMarkSeen(socket: Socket, data: { senderId: string, conversationId?: string }) {
+    const readerId = this.socketToUserId.get(socket.id);
+    if (!readerId) return;
+
+    // Update DB
+    // We want to mark messages FROM data.senderId SENT TO readerId AS 'seen'
+    await MessageModel.updateMany(
+      {
+        senderId: data.senderId,
+        receiverId: readerId,
+        status: { $ne: 'seen' }
+      },
+      { status: 'seen', isRead: true }
+    );
+
+    // Notify the Sender (that their messages were seen)
+    const senderSocketId = this.userIdToSocket.get(data.senderId);
+    if (senderSocketId) {
+      this.io.to(senderSocketId).emit('message-seen', {
+        readerId,
+        conversationId: data.conversationId // Optional, for frontend mapping
       });
     }
   }
@@ -487,7 +656,5 @@ export class SocketGateway {
         });
       });
     }
-    // TODO: Handle Post-Call Chat Typing (using ChatId -> Participants)
-    // This is less critical for "Random Chat" live phase but good for "Friends" phase.
   }
 }

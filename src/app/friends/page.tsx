@@ -155,7 +155,7 @@ export default function FriendsPage() {
                                             </div>
                                             <button
                                                 onClick={() => sendFriendRequest(user._id)}
-                                                className="p-2 bg-surface border border-border text-gold rounded-xl hover:bg-gold hover:text-white transition-all shadow-sm"
+                                                className="p-2 bg-surface border border-border text-gold rounded-xl hover:bg-gold hover:text-black transition-all shadow-sm"
                                             >
                                                 <UserPlus size={18} />
                                             </button>

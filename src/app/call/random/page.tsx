@@ -250,15 +250,15 @@ export default function RandomChatPage() {
                     {/* IDLE VIEW: Waiting state (No Recommendations List) */}
                     {callState === 'idle' && !proposal && (
                         <div className="absolute inset-0 z-10 bg-surface/95 flex flex-col items-center justify-center p-8 text-center">
-                            <h2 className="text-2xl font-bold mb-4 text-white">Looking for a match...</h2>
+                            <h2 className="text-2xl font-bold mb-4 text-text-primary">Looking for a match...</h2>
                             <div className="animate-spin w-8 h-8 border-4 border-gold border-t-transparent rounded-full opacity-50"></div>
                         </div>
                     )}
 
                     {/* MATCHING VIEW */}
                     {callState === 'matching' && !proposal && (
-                        <div className="absolute inset-0 z-20 bg-black/80 flex items-center justify-center">
-                            <div className="text-white text-xl animate-pulse">Connecting...</div>
+                        <div className="absolute inset-0 z-20 bg-background/90 backdrop-blur-sm flex items-center justify-center">
+                            <div className="text-text-primary text-xl animate-pulse font-bold">Connecting...</div>
                         </div>
                     )}
 
@@ -299,7 +299,7 @@ export default function RandomChatPage() {
                             />
 
                             {/* Local Video - Only show when connected or fitting to layout */}
-                            <div className="absolute top-4 right-4 w-32 sm:w-40 md:w-56 aspect-[4/3] z-20 overflow-hidden rounded-xl border-2 border-primary/20 bg-black shadow-lg">
+                            <div className="absolute top-4 right-4 w-32 sm:w-40 md:w-56 aspect-[4/3] z-20 overflow-hidden rounded-xl border-2 border-gold/20 bg-surface shadow-lg">
                                 <LocalVideo />
                             </div>
                         </>

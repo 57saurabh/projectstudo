@@ -27,10 +27,10 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 {!isAuthPage && <Header />}
                 <main
                     ref={mainRef}
-                    className={`flex-1 overflow-y-auto transition-all duration-300 ease-in-out flex flex-col ${!isAuthPage ? 'w-full pb-20 lg:pb-0' : ''
-                        }`}
+                    className={`flex-1 transition-all duration-300 ease-in-out flex flex-col ${pathname === '/messages' ? 'overflow-hidden h-full' : 'overflow-y-auto'
+                        } ${!isAuthPage ? 'w-full pb-20 lg:pb-0' : ''}`}
                 >
-                    <div className="flex-1 p-2 lg:p-4">
+                    <div className={`flex-1 ${pathname === '/messages' ? 'h-full p-0' : 'p-2 lg:p-4'}`}>
                         {children}
                     </div>
                 </main>

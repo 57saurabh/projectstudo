@@ -56,7 +56,7 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
 
     const markAsRead = useCallback((senderId: string) => {
         if (!socketRef.current) return;
-        socketRef.current.emit('mark-read', { senderId });
+        socketRef.current.emit('mark-seen', { senderId });
         setTimeout(fetchUnreadCount, 500);
     }, [fetchUnreadCount]);
 
@@ -320,24 +320,48 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
         });
 
         // Chat Events
-        socket.on('chat-message', (data: { senderId: string, text: string, chatId?: string, timestamp: any }) => {
-            console.log('[Signaling] Chat Message', data);
+        socket.on('chat-message', (data: { senderId: string, senderName?: string, senderAvatar?: string, text: string, chatId: string, timestamp: string }) => {
+            console.log('[SignalingContext] Received chat message:', data);
 
             // Check if it belongs to current chat
             const currentChatId = useCallStore.getState().chatId;
-            if (data.chatId && data.chatId !== currentChatId) {
-                // Background notification or unread count
-                setUnreadCount(prev => prev + 1);
-                return;
-            }
 
             useCallStore.getState().addMessage({
                 senderId: data.senderId,
-                senderName: 'Partner', // We might need to look up name from participants list
+                senderName: data.senderName || 'Partner',
+                senderAvatar: data.senderAvatar,
                 text: data.text,
-                timestamp: data.timestamp || Date.now(),
+                timestamp: data.timestamp,
                 chatId: data.chatId
             });
+
+            // If incoming message 
+            if (data.senderId !== user?.id) {
+                // FIX: Show correct name in toast
+                toast(data.senderName || 'Partner', {
+                    description: data.text,
+                });
+            }
+        });
+
+        // Chat History Handler (New)
+        socket.on('chat-history', (data: { chatId: string, messages: any[] }) => {
+            console.log('[SignalingContext] Received chat history:', data.messages.length);
+
+            const formattedMessages = data.messages.map(msg => ({
+                chatId: data.chatId,
+                senderId: msg.senderId,
+                senderName: msg.senderName || 'Partner', // Backend attempts to map, else fallback
+                senderAvatar: msg.senderAvatar,
+                text: msg.text,
+                timestamp: msg.timestamp,
+                isSystem: false
+            }));
+
+            // Replace current messages or Append? 
+            // Usually history replaces initial empty state.
+            // Since we just joined, it should replace.
+            useCallStore.getState().setMessages(formattedMessages);
         });
 
         // Call Events

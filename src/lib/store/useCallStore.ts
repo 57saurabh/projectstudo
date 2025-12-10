@@ -22,6 +22,7 @@ export interface ChatMessage {
   chatId?: string;
   senderId: string;
   senderName: string;
+  senderAvatar?: string;
   text: string;
   timestamp: Date | string | number; // flexible
   isSystem?: boolean;

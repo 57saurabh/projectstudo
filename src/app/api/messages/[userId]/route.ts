@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import dbConnect from '@/lib/db';
-import { ConversationModel } from '@backend/src/models/Conversation';
+import { ChatModel } from '@backend/src/models/Chat';
+import { MessageModel } from '@backend/src/models/Message';
 import { UserModel } from '@/models/User.schema';
 import { FriendRequestModel } from '@backend/src/models/FriendRequest';
 import jwt from 'jsonwebtoken';
@@ -27,13 +28,16 @@ export async function GET(req: Request, props: { params: Promise<{ userId: strin
 
         const targetUserId = params.userId;
 
-        const conversation = await ConversationModel.findOne({
-            "participants.userId": { $all: [currentUserId, targetUserId] }
+        // 1. Find Chat
+        const chat = await ChatModel.findOne({
+            participants: { $all: [currentUserId, targetUserId], $size: 2 }
         });
 
         let messages: any[] = [];
-        if (conversation) {
-            messages = conversation.messages;
+        if (chat) {
+            // 2. Fetch Messages for this Chat
+            messages = await MessageModel.find({ chatId: chat._id.toString() })
+                .sort({ timestamp: 1 });
         }
 
         // Check friendship status

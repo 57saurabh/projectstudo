@@ -26,6 +26,7 @@ export class MessagesService {
             },
             { $sort: { "lastMessage.timestamp": -1 } }
         ]);
+        console.log('[MessagesService] getConversations raw aggregation:', conversations.length > 0 ? conversations[0] : 'Empty', `Count: ${conversations.length}`);
 
         const formatted = await Promise.all(conversations.map(async (conv) => {
             const partnerId = conv._id;
