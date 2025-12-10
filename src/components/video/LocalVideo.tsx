@@ -34,6 +34,7 @@ export default function LocalVideo() {
         <div className="relative w-full h-full bg-[#2a2a2a] rounded-xl overflow-hidden border-2 border-white/20 shadow-lg group">
             {localStream && localStream.active && !isVideoOff ? (
                 <video
+                    key={localStream.id} // Force re-mount if stream instance replaces (e.g. screen share)
                     ref={videoRef}
                     muted
                     playsInline

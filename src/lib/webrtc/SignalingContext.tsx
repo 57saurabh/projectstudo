@@ -59,6 +59,7 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
     }, [fetchUnreadCount]);
 
     const resetCall = useCallback(() => {
+        console.trace('[SignalingContext] resetCall triggered');
         const store = useCallStore.getState();
         store.setCallState('idle');
         store.setParticipants([]);
@@ -73,8 +74,19 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
 
     const acceptMatch = useCallback((targetId: string) => {
         if (!socketRef.current) return;
-        console.log('Accepting match with:', targetId);
-        socketRef.current.emit('accept-match', { target: targetId });
+        const { proposal } = useCallStore.getState();
+        if (!proposal || !proposal.roomId) {
+            console.error("Cannot accept match: No proposal/roomId found");
+            return;
+        }
+        console.log('Accepting match (vote):', targetId, proposal.roomId);
+
+        // Use the voting event logic
+        socketRef.current.emit('recommendation-action', {
+            action: 'accept',
+            roomId: proposal.roomId,
+            recommendedPeerId: targetId
+        });
     }, []);
 
     const inviteUser = useCallback((targetId: string) => {
@@ -98,20 +110,26 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
         socketRef.current.emit('chat-message', { target: targetId, message: text });
     }, [user]);
 
+    const getOnlineUsers = useCallback(() => {
+        socketRef.current?.emit('get-online-users');
+    }, []);
+
     const skipMatch = useCallback((targetId?: string) => {
-        if (targetId) {
-            socketRef.current?.emit('skip-match', { target: targetId });
+        const { proposal } = useCallStore.getState();
+        if (targetId && proposal && proposal.roomId) {
+            console.log('Skipping match (vote):', targetId);
+            socketRef.current?.emit('recommendation-action', {
+                action: 'skip',
+                roomId: proposal.roomId,
+                recommendedPeerId: targetId
+            });
         }
         resetCall();
-        findMatch();
-    }, [findMatch, resetCall]);
+        getOnlineUsers();
+    }, [resetCall, getOnlineUsers]);
 
     const addRandomUser = useCallback(() => {
         console.log('Requesting to add random user...');
-    }, []);
-
-    const getOnlineUsers = useCallback(() => {
-        socketRef.current?.emit('get-online-users');
     }, []);
 
     useEffect(() => {
@@ -119,9 +137,8 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
 
         // If we already have a socket connected with the SAME userId, don't reconnect
         if (socketRef.current?.connected) {
-            const currentQuery = (socketRef.current as any).query; // simplistic check, or just force reconnect
-            // safer to force reconnect if user changes
-            // console.log('Socket already connected');
+            const currentQuery = (socketRef.current as any).query;
+            // simplistic check, or just force reconnect - skipped for brevity
         }
 
         if (socketRef.current) {
@@ -151,28 +168,22 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
             console.log('Connected to signaling server');
         });
 
-        // Matchmaking Events
         // Matchmaking Events (New Flow)
-        socket.on('proposal-received', (data: any) => {
+        socket.on('proposal-received', (data: { type: 'incoming' | 'outgoing', roomId: string, candidate: any, participants?: any[], keyId?: string }) => {
             console.log('Proposal received:', data);
 
-            // Map backend payload to store Proposal type
-            // Incoming: { type: 'incoming', user: candidate, roomId }
-            // Outgoing: { type: 'outgoing', users: participants, roomId }
+            // Map backend participants to store format
+            const mappedParticipants = data.participants ? data.participants : [data.candidate];
+
             useCallStore.getState().setProposal({
                 roomId: data.roomId,
                 type: data.type,
-                candidate: data.user || data.users?.[0],      // mapped from 'user', fallback to first participant
-                participants: data.users,  // mapped from 'users'
-                createdAt: Date.now(),
-                keyId: data.candidateId // Map explicit key owner
+                candidate: data.candidate,
+                participants: mappedParticipants,
+                createdAt: Date.now()
             });
 
-            // If we are "searching", we might want to switch state to "proposed" or "voting"?
-            // The UI (MatchOverlay) handles display based on 'proposal' existence or callState.
-            // Let's set callState to 'voting' or keep 'searching' but show modal?
-            // Page.tsx logic suggests: callState='voting' logic was there?
-            // Store has 'proposed' state.
+            // Explicitly set Call Sate to proposed to show overlay
             setCallState('proposed');
         });
 
@@ -205,8 +216,12 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
                     if (proposal.participants && proposal.participants.length > 0) {
                         proposal.participants.forEach(pRaw => {
                             const p = pRaw as any;
+                            // Filter out self
+                            const pId = p.peerId || p.id || 'unknown';
+                            if (socket?.id && pId === socket.id) return;
+
                             addParticipant({
-                                peerId: p.peerId || p.id || 'unknown',
+                                peerId: pId,
                                 userId: p.userId || p.id,
                                 displayName: p.displayName,
                                 username: p.username,
@@ -265,16 +280,37 @@ export const SignalingProvider = ({ children }: { children: React.ReactNode }) =
         });
 
         // Call Events
+        // Call Events
+        socket.on('user-left', ({ socketId }) => {
+            console.log('User left:', socketId);
+            removeParticipant(socketId);
+
+            // IMPROVEMENT: For random 1v1 chat, if a user leaves, the call is effectively over for the other person.
+            // We should immediately reset to IDLE so the auto-match logic can kick in.
+            // Check if we are now alone (0 participants left because we removed the one leaving)
+            const store = useCallStore.getState();
+            if (store.participants.length === 0 && store.callState === 'connected') {
+                console.log('Last participant left. Reseting to IDLE to find new match.');
+                resetCall();
+                setCallState('idle');
+                // This will trigger the page.tsx Effect -> set-online -> new match
+            }
+        });
+
         socket.on('peer-left', ({ peerId }) => {
             removeParticipant(peerId);
         });
 
         socket.on('force-disconnect', () => {
-            console.log('Received force-disconnect. Resetting call and searching...');
+            console.log('Received force-disconnect. Resetting call to IDLE (Available).');
             resetCall();
-            setTimeout(() => {
-                findMatch();
-            }, 1000);
+            // Automatically find match? Or just show suggestions?
+            // User said: "returned to AVAILABLE immediately... suggestions UI should open"
+            // 'idle' state shows recommendations.
+            setCallState('idle');
+
+            // Optionally fetch new recommendations immediately
+            getOnlineUsers(); // or socket.emit('get-recommendations')
         });
 
         return () => {

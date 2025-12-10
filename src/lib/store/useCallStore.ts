@@ -1,7 +1,7 @@
 // src/lib/store/useCallStore.ts
 import { create } from 'zustand';
 
-export type CallState = 'idle' | 'searching' | 'proposed' | 'connecting' | 'connected';
+export type CallState = 'idle' | 'searching' | 'matching' | 'proposed' | 'connecting' | 'connected';
 
 export interface ParticipantPublic {
   peerId: string;
@@ -52,6 +52,13 @@ interface CallStore {
   localStream: MediaStream | null;
   setLocalStream: (s: MediaStream | null) => void;
 
+  localScreenStream: MediaStream | null;
+  setLocalScreenStream: (s: MediaStream | null) => void;
+
+  // Map of peerId -> Screen Share Stream
+  remoteScreenShares: Record<string, MediaStream>;
+  setRemoteScreenShare: (peerId: string, stream: MediaStream | null) => void;
+
   participants: ParticipantPublic[];
   setParticipants: (p: ParticipantPublic[]) => void;
   addParticipant: (p: ParticipantPublic) => void;
@@ -78,6 +85,18 @@ export const useCallStore = create<CallStore>()((set, get) => ({
 
   localStream: null,
   setLocalStream: (s) => set({ localStream: s }),
+
+  localScreenStream: null,
+  setLocalScreenStream: (s) => set({ localScreenStream: s }),
+
+  remoteScreenShares: {},
+  setRemoteScreenShare: (peerId, stream) =>
+    set((state) => {
+      const next = { ...state.remoteScreenShares };
+      if (stream) next[peerId] = stream;
+      else delete next[peerId];
+      return { remoteScreenShares: next };
+    }),
 
   participants: [],
   setParticipants: (p) => set({ participants: p }),
