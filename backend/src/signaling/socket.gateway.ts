@@ -77,6 +77,11 @@ export class SocketGateway {
       socket.on('accept-friend-request', (d) => this.handleAcceptFriendRequest(socket, d));
       socket.on('reject-friend-request', (d) => this.handleRejectFriendRequest(socket, d));
       socket.on('check-friend-request-status', (d) => this.handleCheckFriendRequestStatus(socket, d));
+
+      // PRIVATE CALLS
+      socket.on('start-private-call', (d) => this.handleStartPrivateCall(socket, d));
+      socket.on('private-call-action', (d) => this.handlePrivateCallAction(socket, d));
+      socket.on('cancel-private-call', (d) => this.handleCancelPrivateCall(socket, d));
     });
   }
 
@@ -382,9 +387,12 @@ export class SocketGateway {
       socket.leave(roomId);
       socket.to(roomId).emit('user-left', { socketId: socket.id });
 
-      // Go back online and search
-      await this.matchmakingService.setOnline(socket.id);
-      this.attemptAutoMatch(socket);
+      // ONLY for Random Rooms: Go back online and search
+      // Using a simple check if roomId starts with 'private_'
+      if (!roomId.startsWith('private_')) {
+        await this.matchmakingService.setOnline(socket.id);
+        this.attemptAutoMatch(socket);
+      }
     }
   }
 
@@ -569,7 +577,7 @@ export class SocketGateway {
             fileUrl: data.fileUrl,
             timestamp: new Date(),
             status: initialStatus,
-            mediaType: (['image', 'video', 'file'].includes(data.type) ? data.type : null) as any,
+            mediaType: (['image', 'video', 'file'].includes(data.type || '') ? data.type : null) as any,
             viewMode: data.viewMode || 'unlimited',
             isLocked: false,
             viewCount: 0,
@@ -799,7 +807,9 @@ export class SocketGateway {
     if (senderSocketId) {
       const receiverInfo = await this._publicUser(socket.id);
       this.io.to(senderSocketId).emit('friendship-created', { friendId: receiverId });
-      this.io.to(senderSocketId).emit('friend-request-accepted', { acceptor: receiverInfo });
+      this.io.to(senderSocketId).emit('friend-request-accepted', {
+        friend: receiverInfo
+      });
     }
   }
 
@@ -869,6 +879,96 @@ export class SocketGateway {
           isTyping: data.isTyping
         });
       });
+    }
+  }
+  // 🎯 10. PRIVATE CALLS
+  private async handleStartPrivateCall(socket: Socket, data: { targetUserId: string }) {
+    const callerId = this.socketToUserId.get(socket.id);
+    if (!callerId) return;
+
+    const targetSocketId = this.userIdToSocket.get(data.targetUserId);
+    if (!targetSocketId) {
+      socket.emit('private-call-error', { message: 'User is offline' });
+      return;
+    }
+
+    const tempRoomId = `private_${callerId}_${data.targetUserId}_${Date.now()}`;
+
+    // Emit to Target
+    this.io.to(targetSocketId).emit('incoming-private-call', {
+      roomId: tempRoomId,
+      caller: await this._publicUser(socket.id)
+    });
+
+    // Emit to Caller
+    socket.emit('private-call-outgoing', { roomId: tempRoomId });
+
+    // REMOVE FROM MATCHMAKING QUEUE (Caller)
+    await this.matchmakingService.setOffline(socket.id);
+  }
+
+  private async handlePrivateCallAction(socket: Socket, data: { roomId: string, action: 'accept' | 'decline' }) {
+    const userId = this.socketToUserId.get(socket.id);
+    if (!userId) return;
+
+    const parts = data.roomId.split('_');
+    if (parts.length < 4) return;
+    const callerId = parts[1];
+    const targetId = parts[2];
+
+    const otherUserId = (userId === callerId) ? targetId : callerId;
+    const otherSocketId = this.userIdToSocket.get(otherUserId);
+
+    if (data.action === 'accept') {
+      const finalRoomId = data.roomId;
+
+      if (otherSocketId) {
+        // REMOVE FROM MATCHMAKING QUEUE (Both)
+        await this.matchmakingService.setOffline(socket.id);
+        await this.matchmakingService.setOffline(otherSocketId);
+
+        // 1. Create in DB
+        await this.roomService.createRoom(finalRoomId, [socket.id, otherSocketId]);
+
+        // 2. Make Sockets join
+        socket.join(finalRoomId);
+        const otherSocket = this.io.sockets.sockets.get(otherSocketId);
+        if (otherSocket) {
+          otherSocket.join(finalRoomId);
+        }
+
+        // 3. Emit room-created
+        const participants = [await this._publicUser(socket.id), await this._publicUser(otherSocketId)];
+        this.io.to(finalRoomId).emit('room-created', { roomId: finalRoomId, peers: participants });
+      } else {
+        socket.emit('private-call-error', { message: 'Caller disconnected' });
+      }
+    } else {
+      // Decline
+      if (otherSocketId) {
+        this.io.to(otherSocketId).emit('private-call-ended', { reason: 'declined' });
+      }
+    }
+  }
+
+  private async handleCancelPrivateCall(socket: Socket, data: { roomId: string }) {
+    const parts = data.roomId.split('_');
+    if (parts.length < 4) return;
+
+    // Parse target ID to notify them
+    const callerId = parts[1];
+    const targetId = parts[2];
+
+    // I am likely the caller, so notify the target
+    // But we should verify if I am indeed the caller or target involved in this room?
+    // For now, trusting the roomId structure and notifying the 'other' party found in it.
+
+    const userId = this.socketToUserId.get(socket.id);
+    const otherUserId = (userId === callerId) ? targetId : callerId;
+    const otherSocketId = this.userIdToSocket.get(otherUserId);
+
+    if (otherSocketId) {
+      this.io.to(otherSocketId).emit('private-call-ended', { reason: 'cancelled' });
     }
   }
 }

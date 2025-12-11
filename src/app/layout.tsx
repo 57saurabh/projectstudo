@@ -14,6 +14,9 @@ import AuthInitializer from "@/components/auth/AuthInitializer";
 import { Toaster } from 'sonner';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
+import GlobalCallHandler from "@/components/call/GlobalCallHandler";
+import IncomingCallBanner from "@/components/call/private/IncomingCallBanner";
+
 const inter = Inter({ subsets: ["latin"], variable: '--font-inter' });
 
 export const metadata: Metadata = {
@@ -34,6 +37,8 @@ export default function RootLayout({
             <ThemeProvider>
               <SignalingProvider>
                 <NotificationManager />
+                <GlobalCallHandler />
+                <IncomingCallBanner />
                 <SidebarProvider>
                   <AuthInitializer />
                   <CameraGuard />

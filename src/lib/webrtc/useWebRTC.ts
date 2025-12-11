@@ -1,6 +1,6 @@
 // src/lib/webrtc/useWebRTC.ts
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useSignaling } from './SignalingContext';
 import { useCallStore } from '@/lib/store/useCallStore';
 import { toast } from 'sonner';
@@ -366,46 +366,56 @@ export function useWebRTC(localVideoRef: React.RefObject<HTMLVideoElement | null
     setIsScreenSharing(false);
   };
 
+  const createPeerCallback = useCallback((id: string) => createPeer(id), []);
+
+  const closePeerCallback = useCallback((id: string) => {
+    if (pcs.current[id]) {
+      try { pcs.current[id].close(); } catch (e) { }
+    }
+    delete pcs.current[id];
+    setRemoteStreams(p => { const n = { ...p }; delete n[id]; return n; });
+    setRemoteScreenShare(id, null);
+    removeParticipant(id);
+  }, [removeParticipant, setRemoteScreenShare]);
+
+  const stopAll = useCallback(() => {
+    console.trace('[useWebRTC] stopAll');
+    stopMediaRefs();
+    Object.values(pcs.current).forEach(pc => { try { pc.close() } catch (e) { } });
+    pcs.current = {};
+    setLocalStream(null);
+    setLocalScreenStream(null);
+    setCallState('idle');
+    setIsScreenSharing(false);
+  }, [setLocalStream, setLocalScreenStream, setCallState]);
+
+  const shareScreenCallback = useCallback(async () => {
+    if (isScreenSharing) {
+      stopScreenShare();
+      return;
+    }
+    try {
+      const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      localScreenStreamRef.current = screenStream;
+      setLocalScreenStream(screenStream);
+      setIsScreenSharing(true);
+      screenStream.getTracks().forEach(track => {
+        Object.values(pcs.current).forEach(pc => pc.addTrack(track, screenStream));
+        track.onended = () => stopScreenShare();
+      });
+    } catch (e) {
+      console.error("Screen share failed", e);
+      setIsScreenSharing(false);
+    }
+  }, [isScreenSharing, setLocalScreenStream]); // Dependencies for shareScreen
+
   return {
     localStream: localStreamRef.current,
     remoteStreams,
-    createPeer: (id: string) => createPeer(id),
-    closePeer: (id: string) => {
-      if (pcs.current[id]) pcs.current[id].close();
-      delete pcs.current[id];
-      setRemoteStreams(p => { const n = { ...p }; delete n[id]; return n; });
-      setRemoteScreenShare(id, null);
-      removeParticipant(id);
-    },
-    stopAll: () => {
-      console.trace('[useWebRTC] stopAll');
-      stopMediaRefs();
-      Object.values(pcs.current).forEach(pc => pc.close());
-      pcs.current = {};
-      setLocalStream(null);
-      setLocalScreenStream(null);
-      setCallState('idle');
-      setIsScreenSharing(false);
-    },
-    shareScreen: async () => {
-      if (isScreenSharing) {
-        stopScreenShare();
-        return;
-      }
-      try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-        localScreenStreamRef.current = screenStream;
-        setLocalScreenStream(screenStream);
-        setIsScreenSharing(true);
-        screenStream.getTracks().forEach(track => {
-          Object.values(pcs.current).forEach(pc => pc.addTrack(track, screenStream));
-          track.onended = () => stopScreenShare();
-        });
-      } catch (e) {
-        console.error("Screen share failed", e);
-        setIsScreenSharing(false);
-      }
-    },
+    createPeer: createPeerCallback,
+    closePeer: closePeerCallback,
+    stopAll,
+    shareScreen: shareScreenCallback,
     isScreenSharing,
     // Removed direct store access to avoid reactivity issues. 
     // page.tsx accesses these values via useCallStore().

@@ -16,10 +16,9 @@ import { remoteAiService } from '@/lib/ai/RemoteAiService';
 // Components
 import InviteUserModal from '@/components/call/random/InviteUserModal';
 import MatchOverlay from '@/components/call/random/MatchOverlay';
-import VideoGrid from '@/components/call/random/VideoGrid';
-import Controls from '@/components/call/random/Controls';
-import ChatArea from '@/components/call/random/ChatArea';
+import ActiveCallView from '@/components/call/shared/ActiveCallView';
 import RecommendationsView from '@/components/call/random/RecommendationsView';
+
 
 export default function RandomChatPage() {
     const { user, token } = useSelector((state: RootState) => state.auth);
@@ -67,16 +66,7 @@ export default function RandomChatPage() {
 
     // Local UI State
     const [recommendations, setRecommendations] = useState<any[]>([]);
-    const [isMuted, setIsMuted] = useState(false);
-    const [isVideoOff, setIsVideoOff] = useState(false);
-    const [inputMessage, setInputMessage] = useState('');
-    const [showChat, setShowChat] = useState(false);
     const [hasAccepted, setHasAccepted] = useState(false);
-
-    // Moderation
-    const [faceWarning, setFaceWarning] = useState<string | null>(null);
-    const [nsfwWarning, setNsfwWarning] = useState<string | null>(null);
-    const lastFaceDetectedTime = useRef<number>(Date.now());
 
     const router = useRouter();
 
@@ -176,52 +166,10 @@ export default function RandomChatPage() {
     }, [socket, stopAll]);
 
     // -- Controls --
-    const toggleMic = () => {
-        if (localStream) {
-            localStream.getAudioTracks().forEach(t => t.enabled = !t.enabled);
-            setIsMuted(!localStream.getAudioTracks()[0]?.enabled);
-        }
-    };
-    const toggleCam = () => {
-        if (localStream) {
-            localStream.getVideoTracks().forEach(t => t.enabled = !t.enabled);
-            setIsVideoOff(!localStream.getVideoTracks()[0]?.enabled);
-        }
-    };
-    const toggleScreenShare = () => {
-        shareScreen();
-    };
+    // Handled by ActiveCallView
 
-    // -- AI Analysis (Keep existing logic mostly) --
-    useEffect(() => {
-        if (!localStream || !analysisVideoRef.current || callState !== 'connected') return;
-
-        const videoEl = analysisVideoRef.current;
-        videoEl.srcObject = localStream;
-        videoEl.play().catch(() => { });
-
-        const interval = setInterval(async () => {
-            // ... (Same AI logic as before) ...
-            const result = await remoteAiService.analyze(videoEl);
-            if (result) {
-                if (result.faceDetected) {
-                    lastFaceDetectedTime.current = Date.now();
-                    setFaceWarning(null);
-                } else {
-                    if (Date.now() - lastFaceDetectedTime.current > 30000) {
-                        setFaceWarning('Face not visible!');
-                    }
-                }
-                if (!result.isSafe) {
-                    console.warn('[RandomChat] NSFW detected! (Auto-abort disabled for debugging)');
-                    toast.error('NSFW detected (Warning)');
-                    // abortCall(); // 🔴 Auto-abort temporarily disabled to prevent false positives
-                }
-            }
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, [localStream, callState, abortCall]);
+    // -- AI Analysis --
+    // Handled by ActiveCallView
 
     // -- Friendship Timer --
     useEffect(() => {
@@ -235,11 +183,6 @@ export default function RandomChatPage() {
         return () => clearTimeout(timer);
     }, [socket, callState, chatId]);
 
-    const onSendMessage = (e?: React.FormEvent) => {
-        e?.preventDefault();
-        sendMessage(participants[0]?.peerId, inputMessage);
-        setInputMessage('');
-    };
 
     return (
         <div className="relative flex h-full w-full flex-col bg-background font-sans overflow-hidden text-text-primary">
@@ -290,60 +233,16 @@ export default function RandomChatPage() {
 
                     {/* CONNECTED VIEW (Strictly Connected) */}
                     {callState === 'connected' && (
-                        <>
-                            <VideoGrid
-                                participants={participants}
-                                remoteStreams={remoteStreams}
-                                remoteScreenShares={remoteScreenShares}
-                                localScreenStream={localScreenStream}
-                                callState={callState}
-                            />
-
-                            {/* Local Video - Only show when connected or fitting to layout */}
-                            <div className="absolute top-4 right-4 w-32 sm:w-40 md:w-56 aspect-[4/3] z-20 overflow-hidden rounded-xl border-2 border-gold/20 bg-surface shadow-lg">
-                                <LocalVideo />
-                            </div>
-                        </>
-                    )}
-
-                    {callState === 'connected' && (
-                        <div className="absolute bottom-6 left-0 right-0 z-30 flex justify-center pointer-events-none">
-                            <div className="pointer-events-auto">
-                                <Controls
-                                    isMuted={isMuted}
-                                    toggleMic={toggleMic}
-                                    toggleScreenShare={toggleScreenShare}
-                                    isScreenSharing={isScreenSharing}
-                                    showChat={showChat}
-                                    setShowChat={setShowChat}
-                                    onSkip={abortCall}
-                                    onAddFriend={() => { }}
-                                    canAddFriend={false}
-                                    onInvite={() => { }}
-                                    onAddRandomUser={() => {
-                                        // "Next" logic: Leave current room -> automatic backend toggle to online -> match
-                                        abortCall();
-                                    }}
-                                />
-                            </div>
-                        </div>
+                        <ActiveCallView
+                            webrtc={useWebRTC_Hook}
+                            onLeave={abortCall}
+                            onNext={() => abortCall()} // Next triggers abort -> auto-requeue
+                            isRandomMode={true}
+                        />
                     )}
                 </div>
-
-                <ChatArea
-                    showChat={showChat}
-                    messages={messages}
-                    user={user}
-                    inputMessage={inputMessage}
-                    setInputMessage={setInputMessage}
-                    onSendMessage={onSendMessage}
-                    currentPeerId={participants[0]?.peerId}
-                    chatId={chatId}
-                    isFriend={isFriend}
-                    remoteIsTyping={remoteIsTyping}
-                    sendTyping={sendTyping}
-                />
             </main>
         </div>
+
     );
 }

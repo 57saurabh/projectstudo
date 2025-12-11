@@ -1,7 +1,7 @@
 // src/lib/store/useCallStore.ts
 import { create } from 'zustand';
 
-export type CallState = 'idle' | 'searching' | 'matching' | 'proposed' | 'connecting' | 'connected';
+export type CallState = 'idle' | 'searching' | 'matching' | 'proposed' | 'connecting' | 'connected' | 'calling' | 'incoming';
 
 export interface ParticipantPublic {
   peerId: string;
@@ -59,6 +59,12 @@ export interface Proposal {
   keyId?: string; // Explicit ID for voting (The Proposal Owner)
 }
 
+export interface IncomingCall {
+  roomId: string;
+  caller: ParticipantPublic;
+  type: 'private';
+}
+
 interface CallStore {
   notifications: Notification[];
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp' | 'isRead'>) => void;
@@ -67,6 +73,9 @@ interface CallStore {
 
   callState: CallState;
   setCallState: (s: CallState) => void;
+
+  incomingCall: IncomingCall | null;
+  setIncomingCall: (c: IncomingCall | null) => void;
 
   currentRoomId: string | null;
   setCurrentRoomId: (id: string | null) => void;
@@ -115,6 +124,9 @@ interface CallStore {
 export const useCallStore = create<CallStore>()((set, get) => ({
   callState: 'idle',
   setCallState: (s) => set({ callState: s }),
+
+  incomingCall: null,
+  setIncomingCall: (c) => set({ incomingCall: c }),
 
   currentRoomId: null,
   setCurrentRoomId: (id) => set({ currentRoomId: id }),
